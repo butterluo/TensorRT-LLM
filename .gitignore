@@ -40,3 +40,9 @@ tensorrt_llm/bindings/*.pyi
 # Testing
 .coverage.*
 results_trt/
+
+# NOT commit to gitee
+*.a
+*.so
+*.dll
+*.lib
