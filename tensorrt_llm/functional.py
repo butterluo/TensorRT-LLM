@@ -4177,7 +4177,7 @@ def gpt_attention(
     use_cache: bool = True,
     spec_decoding_position_offsets: Tensor = None,
     spec_decoding_packed_mask: Tensor = None,
-) -> Tuple[Tensor, Optional[Tensor]]:
+) -> Tuple[Tensor, Optional[Tensor]]:#@#lma @#qwn
     '''
     Add an operation that performs the multi-head attention in GPT-like models.
 
@@ -4378,7 +4378,7 @@ def gpt_attention(
     assert host_request_types is not None
     assert (alibi_slopes is not None) == (position_embedding_type.is_alibi())
     attn_plg_creator = trt.get_plugin_registry().get_plugin_creator(
-        'GPTAttention', '1', TRT_LLM_PLUGIN_NAMESPACE)
+        'GPTAttention', '1', TRT_LLM_PLUGIN_NAMESPACE)#@#lma 创建了cpp/tensorrt_llm/plugins/gptAttentionPlugin/gptAttentionPlugin.cpp中的GPTAttentionPluginCreator
     assert attn_plg_creator is not None
     assert host_context_lengths is not None or not default_net(
     ).plugin_config.remove_input_padding
@@ -4539,7 +4539,7 @@ def gpt_attention(
         use_fp8_context_fmha_field, use_cache_pf, is_spec_decoding_enabled
     ])
 
-    attn_plug = attn_plg_creator.create_plugin("causal_attn", pfc)
+    attn_plug = attn_plg_creator.create_plugin("causal_attn", pfc)#@#lma 此时调的是cpp/tensorrt_llm/plugins/gptAttentionPlugin/gptAttentionPlugin.cpp.GPTAttentionPluginCreator::createPlugin()
     plug_inputs = [*qkv] if is_unfuse_qkv_gemm else [qkv]
     if use_cache:
         plug_inputs += [

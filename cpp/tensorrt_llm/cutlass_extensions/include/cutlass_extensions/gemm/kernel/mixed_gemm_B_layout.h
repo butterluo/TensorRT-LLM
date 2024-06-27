@@ -82,7 +82,7 @@ struct LayoutDetailsB<TypeA, bfloat16_t, Arch, typename platform::enable_if<Arch
 template <typename TypeA, typename Arch>
     struct LayoutDetailsB < TypeA,
     uint8_t, Arch,
-    typename platform::enable_if<Arch::kMinComputeCapability >= 75 && Arch::kMinComputeCapability<90>::type>
+    typename platform::enable_if<Arch::kMinComputeCapability >= 75 && (Arch::kMinComputeCapability<90) >::type>
 {
     static constexpr int ThreadblockK = 128 * 8 / cutlass::sizeof_bits<TypeA>::value;
 
@@ -99,9 +99,9 @@ public:
 template <typename TypeA, typename Arch>
     struct LayoutDetailsB < TypeA,
     uint4b_t, Arch,
-    typename platform::enable_if<Arch::kMinComputeCapability >= 75 && Arch::kMinComputeCapability<90>::type>
+    typename platform::enable_if<Arch::kMinComputeCapability >= 75 && (Arch::kMinComputeCapability<90) >::type> //@#quant sm75,80,86,89
 {
-    static constexpr int ThreadblockK = 128 * 8 / cutlass::sizeof_bits<TypeA>::value;
+    static constexpr int ThreadblockK = 128 * 8 / cutlass::sizeof_bits<TypeA>::value;//@#??? 为什么这里这么多乘8?是byte=8的缘故么
 
 private:
     static constexpr int ElementsPerCacheLine = 128 * 8 / sizeof_bits<uint4b_t>::value;

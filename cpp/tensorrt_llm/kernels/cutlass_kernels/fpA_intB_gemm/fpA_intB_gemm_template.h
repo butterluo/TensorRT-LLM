@@ -60,7 +60,7 @@ void generic_mixed_gemm_kernelLauncher(ActivationType const* A, WeightType const
     cudaStream_t stream, int* occupancy = nullptr)
 {
     TLLM_LOG_DEBUG(__PRETTY_FUNCTION__);
-
+    //这if宏是用各种static_assert做检查
 #ifdef ENABLE_BF16
     static_assert(
 #ifdef ENABLE_FP8
@@ -91,28 +91,28 @@ void generic_mixed_gemm_kernelLauncher(ActivationType const* A, WeightType const
     // We need separate config for each architecture since we will target different tensorcore instructions. For float,
     // we do not target TCs.
     using MixedGemmArchTraits
-        = cutlass::gemm::kernel::MixedGemmArchTraits<CutlassActivationType, CutlassWeightType, arch>;
-    using ElementAccumulator = typename MixedGemmArchTraits::AccType;
+        = cutlass::gemm::kernel::MixedGemmArchTraits<CutlassActivationType, CutlassWeightType, arch>;//@#??? 预置了很多配置，有专门针对sm80的，但没针对sm86的，其中instructShape也写死了，可能改MixedGemmArchTraits会带来一些提升
+    using ElementAccumulator = typename MixedGemmArchTraits::AccType;//float
 
     constexpr int ElementsPerAccessC = 128 / cutlass::sizeof_bits<CutlassOutputType>::value;
     using EpilogueOp =
-        typename tkc::Epilogue<CutlassOutputType, ElementsPerAccessC, ElementAccumulator, EpilogueTag>::Op;
+        typename tkc::Epilogue<CutlassOutputType, ElementsPerAccessC, ElementAccumulator, EpilogueTag>::Op;//EpilogueTag=EpilogueOpBias见下面gemm()的'dispatch_to_arch<tkc::EpilogueOpBias>'
 
-    using Operator = typename MixedGemmArchTraits::Operator;
-    using TaggedOperator = typename cutlass::arch::TagOperator<Operator, QuantOp>::TaggedOperator;
+    using Operator = typename MixedGemmArchTraits::Operator;//=OpClassTensorOp=mma.sync
+    using TaggedOperator = typename cutlass::arch::TagOperator<Operator, QuantOp>::TaggedOperator;//OpMultiplyAddDequantizeInterleavedBToA_fine_scalebias(cpp/tensorrt_llm/cutlass_extensions/include/cutlass_extensions/arch/mma.h)
 
-    using GemmKernel_ = typename cutlass::gemm::kernel::DefaultGemm<CutlassActivationType, cutlass::layout::RowMajor,
-        MixedGemmArchTraits::ElementsPerAccessA, CutlassWeightType, typename MixedGemmArchTraits::LayoutB,
-        MixedGemmArchTraits::ElementsPerAccessB, CutlassOutputType, cutlass::layout::RowMajor, ElementAccumulator,
-        cutlass::arch::OpClassTensorOp, arch, ThreadblockShape, WarpShape,
+    using GemmKernel_ = typename cutlass::gemm::kernel::DefaultGemm<CutlassActivationType/*typA*/, cutlass::layout::RowMajor,
+        MixedGemmArchTraits::ElementsPerAccessA/*alignmetA*/, CutlassWeightType/*typB*/, typename MixedGemmArchTraits::LayoutB,
+        MixedGemmArchTraits::ElementsPerAccessB, CutlassOutputType/*typC*/, cutlass::layout::RowMajor, ElementAccumulator/*type for internal accumulation*/,
+        cutlass::arch::OpClassTensorOp/*Operator class tag*/, arch, ThreadblockShape, WarpShape,
         typename MixedGemmArchTraits::InstructionShape, EpilogueOp,
-        typename cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, Stages, true,
-        TaggedOperator>::GemmKernel;
+        typename cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, Stages/*Number of stages used in the pipelined mainloop*/, true/*SplitKSerial If true, kernel is configured to support serial reduction in epilogue*/,
+        TaggedOperator/*Operation performed by GEMM*/>::GemmKernel;
 
     using GemmKernel = cutlass::gemm::kernel::GemmFpAIntB<typename GemmKernel_::Mma, typename GemmKernel_::Epilogue,
         typename GemmKernel_::ThreadblockSwizzle,
         arch, // Ensure top level arch is used for dispatch
-        GemmKernel_::kSplitKSerial>;
+        GemmKernel_::kSplitKSerial>;//@#quant
 
     if (occupancy != nullptr)
     {
@@ -125,12 +125,11 @@ void generic_mixed_gemm_kernelLauncher(ActivationType const* A, WeightType const
     int const ldb = cutlass::platform::is_same<cutlass::layout::RowMajor, typename MixedGemmArchTraits::LayoutB>::value
         ? n
         : k * GemmKernel::kInterleave;
-
+    //下面4个if/else都是做运行前的检查的
     if (weight_scales == nullptr)
     {
         throw std::runtime_error("Weight scales must always be set to a non-null value.");
     }
-
     if constexpr (cutlass::isFinegrained(QuantOp))
     {
         if constexpr (cutlass::platform::is_same<CutlassActivationType, float_e4m3_t>::value)
@@ -172,6 +171,16 @@ void generic_mixed_gemm_kernelLauncher(ActivationType const* A, WeightType const
             throw std::runtime_error("Weight zero-points must be null when running per column scaling");
         }
     }
+    // This assertion is enabled because because for the column interleaved layout, K MUST be a multiple of
+    // threadblockK. The reason for this is that the default pitchlinear iterators are used to handle walking over the
+    // interleaved matrix. The way masking in handled in these do not map to the interleaved layout. We need to write
+    // our own predicated iterator in order to relax this limitation.
+    if (GemmKernel::kInterleave > 1
+        && ((k % MixedGemmArchTraits::ThreadblockK)
+            || ((k / gemm_config.split_k_factor) % MixedGemmArchTraits::ThreadblockK)))
+    {
+        throw std::runtime_error("Temp assertion: k must be multiple of threadblockK");
+    }
 
     int const ld_scale_zero = cutlass::isFinegrained(QuantOp) ? n : 0;
     ElementAccumulator output_op_beta = (biases == nullptr) ? ElementAccumulator(0.f) : ElementAccumulator(1.f);
@@ -183,17 +192,6 @@ void generic_mixed_gemm_kernelLauncher(ActivationType const* A, WeightType const
         {reinterpret_cast<CutlassBiasType*>(const_cast<BiasType*>(biases)), 0},
         {reinterpret_cast<CutlassOutputType*>(C), n}, gemm_config.split_k_factor,
         {ElementAccumulator(alpha), output_op_beta});
-
-    // This assertion is enabled because because for the column interleaved layout, K MUST be a multiple of
-    // threadblockK. The reason for this is that the default pitchlinear iterators are used to handle walking over the
-    // interleaved matrix. The way masking in handled in these do not map to the interleaved layout. We need to write
-    // our own predicated iterator in order to relax this limitation.
-    if (GemmKernel::kInterleave > 1
-        && ((k % MixedGemmArchTraits::ThreadblockK)
-            || ((k / gemm_config.split_k_factor) % MixedGemmArchTraits::ThreadblockK)))
-    {
-        throw std::runtime_error("Temp assertion: k must be multiple of threadblockK");
-    }
 
     Gemm gemm;
     if (gemm.get_workspace_size(args) > workspace_bytes)
@@ -272,7 +270,7 @@ void filter_and_run_mixed_gemm(ActivationType const* A, WeightType const* B, Sca
         throw std::runtime_error("[TensorRT-LLm Error][filter_and_run_mixed_gemm] " + err_msg);
     }
     else
-    {
+    {//@#quant RTX30*系列显卡的计算能力是sm86，貌似只能走该分支
         generic_mixed_gemm_kernelLauncher<ActivationType, WeightType, ScaleZeroType, BiasType, OutputType, arch,
             QuantOp, EpilogueTag, ThreadblockShape, WarpShape, Stages>(A, B, weight_scales, weight_zero_points, biases,
             alpha, C, m, n, k, group_size, gemm_config, workspace, workspace_bytes, stream, occupancy);
@@ -294,7 +292,7 @@ void dispatch_gemm_config(ActivationType const* A, WeightType const* B, ScaleZer
     case 2:
         filter_and_run_mixed_gemm<ActivationType, WeightType, ScaleZeroType, BiasType, OutputType, arch, QuantOp,
             EpilogueTag, ThreadblockShape, WarpShape, 2>(A, B, weight_scales, weight_zero_points, biases, alpha, C, m,
-            n, k, group_size, gemm_config, workspace, workspace_bytes, stream, occupancy);
+            n, k, group_size, gemm_config, workspace, workspace_bytes, stream, occupancy);//@#quant 一般的gemm都是两个stage(vram->shareMem,shareMem->reg)，其它多个stage的是啥???在cutls中没找到例子
         break;
     case 3:
         filter_and_run_mixed_gemm<ActivationType, WeightType, ScaleZeroType, BiasType, OutputType, arch, QuantOp,
@@ -346,14 +344,14 @@ void dispatch_gemm_to_cutlass(ActivationType const* A, WeightType const* B, Scal
         constexpr int tile_shape_k = 128 * 8 / cutlass::sizeof_bits<ActivationType>::value;
         switch (gemm_config.tile_config)
         {
-        case tkc::CutlassTileConfig::CtaShape16x128x64_WarpShape16x32x64:
+        case tkc::CutlassTileConfig::CtaShape16x128x64_WarpShape16x32x64://@#???可否定义其它的blk til/wrp til尺寸
             TLLM_CHECK_WITH_INFO(arch::kMinComputeCapability >= 75, "Invalid config on Volta");
             if constexpr (arch::kMinComputeCapability >= 75)
             {
                 dispatch_gemm_config<ActivationType, WeightType, ScaleZeroType, BiasType, OutputType, arch, QuantOp,
                     EpilogueTag, cutlass::gemm::GemmShape<16, 128, tile_shape_k>,
                     cutlass::gemm::GemmShape<16, 32, tile_shape_k>>(A, B, weight_scales, weight_zero_points, biases,
-                    alpha, C, m, n, k, group_size, gemm_config, workspace, workspace_bytes, stream, occupancy);
+                    alpha, C, m, n, k, group_size, gemm_config, workspace, workspace_bytes, stream, occupancy);//@#quant
             }
             break;
         case tkc::CutlassTileConfig::CtaShape16x256x64_WarpShape16x64x64:
@@ -454,9 +452,9 @@ void CutlassFpAIntBGemmRunner<ActivationType, WeightType, QuantOp, ScaleZeroType
     }
     else if (sm_ >= 80 && sm_ < 89)
     {
-        dispatch_gemm_to_cutlass<ActivationType, WeightType, ScaleZeroType, BiasType, OutputType, cutlass::arch::Sm80,
+        dispatch_gemm_to_cutlass<ActivationType, WeightType, ScaleZeroType, BiasType, OutputType, cutlass::arch::Sm80,//@#TODO 改为sm86在rtx30上会不会快些??? 但会牵涉到其它类的改/增，比如MixedGemmArchTraits就没有针对sm86的
             QuantOp, EpilogueTag>(A, B, weight_scales, weight_zero_points, biases, alpha, C, m, n, k, group_size,
-            workspace_ptr, workspace_bytes, gemm_config, stream, occupancy);
+            workspace_ptr, workspace_bytes, gemm_config, stream, occupancy);//@#quant
     }
     else if (sm_ == 89)
     {
@@ -495,7 +493,7 @@ void CutlassFpAIntBGemmRunner<ActivationType, WeightType, QuantOp, ScaleZeroType
 {
     TLLM_LOG_DEBUG(__PRETTY_FUNCTION__);
     if constexpr ((QuantOp == cutlass::WeightOnlyQuantOp::FINEGRAINED_SCALE_AND_ZEROS)
-        || (QuantOp == cutlass::WeightOnlyQuantOp::FINEGRAINED_SCALE_ONLY))
+        || (QuantOp == cutlass::WeightOnlyQuantOp::FINEGRAINED_SCALE_ONLY))   //@#quant 零点偏移和大小伸缩都要做的那种量化
     {
         dispatch_to_arch<tkc::EpilogueOpBias>((ActivationType const*) A, (WeightType const*) B,
             (ScaleZeroType const*) weight_scales, (ScaleZeroType const*) weight_zero_points, (BiasType const*) biases,

@@ -689,7 +689,7 @@ class Attention(Module):
                 ) else None
                 rope_scaling_factors = None
             mscale = self.mscale if self.position_embedding_type == PositionEmbeddingType.long_rope else None
-            context, past_key_value = gpt_attention(
+            context, past_key_value = gpt_attention(#@#lma qwn
                 qkv=qkv,
                 past_key_value=past_key_value,
                 sequence_length=attention_params.sequence_length,

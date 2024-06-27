@@ -82,7 +82,7 @@ struct TagOperator<OpMultiplyAddDequantizeInterleavedBToA, WeightOnlyQuantOp::FI
 template <>
 struct TagOperator<OpMultiplyAddDequantizeInterleavedBToA, WeightOnlyQuantOp::FINEGRAINED_SCALE_AND_ZEROS>
 {
-    using TaggedOperator = OpMultiplyAddDequantizeInterleavedBToA_fine_scalebias;
+    using TaggedOperator = OpMultiplyAddDequantizeInterleavedBToA_fine_scalebias;//@#quant
 };
 
 // Here we instantiate some structs to "detag" the tagged operator. It splits it back to the original

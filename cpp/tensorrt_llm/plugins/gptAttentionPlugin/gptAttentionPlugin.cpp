@@ -854,7 +854,7 @@ PluginFieldCollection const* GPTAttentionPluginCreator::getFieldNames() noexcept
     return &mFC;
 }
 
-IPluginV2* GPTAttentionPluginCreator::createPlugin(char const* name, PluginFieldCollection const* fc) noexcept
+IPluginV2* GPTAttentionPluginCreator::createPlugin(char const* name, PluginFieldCollection const* fc) noexcept  //@#lma 在tensorrt_llm/functional.py中‘attn_plug = attn_plg_creator.create_plugin("causal_attn", pfc)’时调到这里
 {
     PluginFieldParser p{fc->nbFields, fc->fields};
 

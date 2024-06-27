@@ -114,7 +114,7 @@ public:
 template <typename TypeA, typename TypeB>
 struct MixedGemmArchTraits<TypeA, TypeB, cutlass::arch::Sm80,
     typename cutlass::platform::enable_if<cutlass::platform::is_same<TypeA, cutlass::half_t>::value
-        || cutlass::platform::is_same<TypeA, cutlass::bfloat16_t>::value>::type>
+        || cutlass::platform::is_same<TypeA, cutlass::bfloat16_t>::value>::type>//@#quant ??? 怎么这么多用128除一个数，是因为LDG或其他加载指令最大可到128b的缘故么?
 {
 private:
     using LayoutDetails = LayoutDetailsB<TypeA, TypeB, cutlass::arch::Sm80>;

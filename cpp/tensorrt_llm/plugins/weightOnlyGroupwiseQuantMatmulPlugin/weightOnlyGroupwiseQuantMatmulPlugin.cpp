@@ -203,7 +203,7 @@ void WeightOnlyGroupwiseQuantMatmulPlugin::init(nvinfer1::DataType type, int qua
         {
             if (quant_algo & ZERO)
             {
-                // has zeros
+                // has zeros @#quant
                 m_weightOnlyGroupwiseGemmRunner
                     = std::make_shared<tensorrt_llm::kernels::cutlass_kernels::CutlassFpAIntBGemmRunner<__nv_bfloat16,
                         cutlass::uint4b_t, cutlass::WeightOnlyQuantOp::FINEGRAINED_SCALE_AND_ZEROS>>();
@@ -457,7 +457,7 @@ int WeightOnlyGroupwiseQuantMatmulPlugin::enqueue(nvinfer1::PluginTensorDesc con
             "engine.)");
         m_weightOnlyGroupwiseGemmRunner->gemm(act_ptr, weight_ptr, inputs[mScalesInputIdx], zeros_ptr, biases_ptr,
             alpha, outputs[0], m, real_n, k, mGroupSize, *bestTactic,
-            reinterpret_cast<char*>(workspace) + m * k * sizeof(half), ws_bytes, stream);
+            reinterpret_cast<char*>(workspace) + m * k * sizeof(half), ws_bytes, stream);//@#quant
     }
     return 0;
 }

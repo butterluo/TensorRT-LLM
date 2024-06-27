@@ -63,7 +63,7 @@ class LLaMADecoderLayer(Module):
 
         mlp_hidden_size = config.hidden_size * 4 if config.intermediate_size is None else config.intermediate_size
 
-        ClsMLP = GatedMLP
+        ClsMLP = GatedMLP #@#lma tensorrt_llm/layers/mlp.py GatedMLP or FusedGatedMLP/MLP
         mlp_kwargs = {}
         if config.moe_num_experts > 1:
             ClsMLP = MOE
@@ -104,7 +104,7 @@ class LLaMADecoderLayer(Module):
                 normalized_shape=config.hidden_size,
                 eps=config.norm_epsilon,
                 dtype=config.dtype)
-            ClsMLP = GatedMLP  # TODO: may use FusedGatedMLP to further speedup
+            ClsMLP = GatedMLP  # TODO: may use FusedGatedMLP to further speedup  @#lma
             self.residual_mlp = ClsMLP(
                 hidden_size=config.hidden_size,
                 ffn_hidden_size=config.
