@@ -252,8 +252,8 @@ std::vector<CutlassGemmConfig> get_candidate_configs(
 
     std::vector<CutlassGemmConfig> candidate_configs;
     bool const int8_configs_only = config_type_param & CutlassGemmConfig::INT8_ONLY;
-    int const min_stages = int8_configs_only ? 3 : 2;
-    int const max_stages = int8_configs_only ? 6 : (sm >= 80 ? 4 : 2);
+    int const min_stages = int8_configs_only ? 3 : 2;//@#quant sm86 bf16int4 2
+    int const max_stages = int8_configs_only ? 6 : (sm >= 80 ? 4 : 2);//@#quant sm86 bf16int4 4
     for (auto const& tile_config : tiles)
     {
         for (int stages = min_stages; stages <= max_stages; ++stages)
@@ -261,7 +261,7 @@ std::vector<CutlassGemmConfig> get_candidate_configs(
             CutlassGemmConfig config(tile_config, SplitKStyle::NO_SPLIT_K, 1, stages);
             candidate_configs.push_back(config);
             if (sm >= 75)
-            {
+            {//@#quant sm86 bf16int4 max_split_k=7
                 for (int split_k_factor = 2; split_k_factor <= max_split_k; ++split_k_factor)
                 {
                     auto config = CutlassGemmConfig{tile_config, SplitKStyle::SPLIT_K_SERIAL, split_k_factor, stages};

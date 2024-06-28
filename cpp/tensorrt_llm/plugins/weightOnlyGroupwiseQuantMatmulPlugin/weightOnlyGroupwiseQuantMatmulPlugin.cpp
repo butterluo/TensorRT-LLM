@@ -348,7 +348,7 @@ int WeightOnlyGroupwiseQuantMatmulPlugin::enqueue(nvinfer1::PluginTensorDesc con
     // inputs
     //   0 activations      [M, K]
     //   1 pre-quant scales [K]
-    //   2 weights          [K, N/2]
+    //   2 weights          [K, N/2]   @#quant 这个除以2不一定对，参考tests/quantization/test_weight_only_groupwise_quant_matmul.py._woq_groupwise_matmul()的赋值那段，其实要除以的是32bit中能存放的元素个数，而这个在传入前的外面就除了
     //   3 scales           [K // group_size, N]
     //   4 zeros            [K // group_size, N]
     //   5 biases           [M]

@@ -96,7 +96,7 @@ void generic_mixed_gemm_kernelLauncher(ActivationType const* A, WeightType const
 
     constexpr int ElementsPerAccessC = 128 / cutlass::sizeof_bits<CutlassOutputType>::value;
     using EpilogueOp =
-        typename tkc::Epilogue<CutlassOutputType, ElementsPerAccessC, ElementAccumulator, EpilogueTag>::Op;//EpilogueTag=EpilogueOpBias见下面gemm()的'dispatch_to_arch<tkc::EpilogueOpBias>'
+        typename tkc::Epilogue<CutlassOutputType, ElementsPerAccessC, ElementAccumulator, EpilogueTag>::Op;//EpilogueTag=EpilogueOpBias见下面gemm()的'dispatch_to_arch<tkc::EpilogueOpBias>',and EpilogueOp is LinearCombination due to cpp/tensorrt_llm/cutlass_extensions/include/cutlass_extensions/epilogue_helpers.h:103
 
     using Operator = typename MixedGemmArchTraits::Operator;//=OpClassTensorOp=mma.sync
     using TaggedOperator = typename cutlass::arch::TagOperator<Operator, QuantOp>::TaggedOperator;//OpMultiplyAddDequantizeInterleavedBToA_fine_scalebias(cpp/tensorrt_llm/cutlass_extensions/include/cutlass_extensions/arch/mma.h)
@@ -104,9 +104,9 @@ void generic_mixed_gemm_kernelLauncher(ActivationType const* A, WeightType const
     using GemmKernel_ = typename cutlass::gemm::kernel::DefaultGemm<CutlassActivationType/*typA*/, cutlass::layout::RowMajor,
         MixedGemmArchTraits::ElementsPerAccessA/*alignmetA*/, CutlassWeightType/*typB*/, typename MixedGemmArchTraits::LayoutB,
         MixedGemmArchTraits::ElementsPerAccessB, CutlassOutputType/*typC*/, cutlass::layout::RowMajor, ElementAccumulator/*type for internal accumulation*/,
-        cutlass::arch::OpClassTensorOp/*Operator class tag*/, arch, ThreadblockShape, WarpShape,
-        typename MixedGemmArchTraits::InstructionShape, EpilogueOp,
-        typename cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, Stages/*Number of stages used in the pipelined mainloop*/, true/*SplitKSerial If true, kernel is configured to support serial reduction in epilogue*/,
+        cutlass::arch::OpClassTensorOp/*Operator class tag*/, arch, ThreadblockShape, WarpShape/*@#和ThreadblockShape一样都在dispatch_gemm_to_cutlass()中定义好了*/,
+        typename MixedGemmArchTraits::InstructionShape, EpilogueOp/*EpilogueOutputOp*/,
+        typename cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, Stages/*Number of stages used in the pipelined mainloop*/, true/*SplitKSerial If true, kernel is configured to support serial reduction in epilogue @#quant???Why split*/,
         TaggedOperator/*Operation performed by GEMM*/>::GemmKernel;
 
     using GemmKernel = cutlass::gemm::kernel::GemmFpAIntB<typename GemmKernel_::Mma, typename GemmKernel_::Epilogue,
@@ -122,7 +122,7 @@ void generic_mixed_gemm_kernelLauncher(ActivationType const* A, WeightType const
 
     using Gemm = cutlass::gemm::device::GemmUniversalBaseCompat<GemmKernel>;
 
-    int const ldb = cutlass::platform::is_same<cutlass::layout::RowMajor, typename MixedGemmArchTraits::LayoutB>::value
+    int const ldb = cutlass::platform::is_same<cutlass::layout::RowMajor, typename MixedGemmArchTraits::LayoutB>::value/*@#qwn ColumnMajorTileInterleave*/
         ? n
         : k * GemmKernel::kInterleave;
     //下面4个if/else都是做运行前的检查的
@@ -184,14 +184,15 @@ void generic_mixed_gemm_kernelLauncher(ActivationType const* A, WeightType const
 
     int const ld_scale_zero = cutlass::isFinegrained(QuantOp) ? n : 0;
     ElementAccumulator output_op_beta = (biases == nullptr) ? ElementAccumulator(0.f) : ElementAccumulator(1.f);
-    typename Gemm::Arguments args({m, n, k}, group_size,
+    typename Gemm::Arguments args({m, n, k}/*problem_size*/, group_size,
         {reinterpret_cast<CutlassActivationType*>(const_cast<ActivationType*>(A)), k},
         {reinterpret_cast<CutlassWeightType*>(const_cast<WeightType*>(B)), ldb},
         {reinterpret_cast<CutlassScaleZeroType*>(const_cast<ScaleZeroType*>(weight_scales)), ld_scale_zero},
         {reinterpret_cast<CutlassScaleZeroType*>(const_cast<ScaleZeroType*>(weight_zero_points)), ld_scale_zero},
-        {reinterpret_cast<CutlassBiasType*>(const_cast<BiasType*>(biases)), 0},
-        {reinterpret_cast<CutlassOutputType*>(C), n}, gemm_config.split_k_factor,
-        {ElementAccumulator(alpha), output_op_beta});
+        {reinterpret_cast<CutlassBiasType*>(const_cast<BiasType*>(biases)), 0}/*TensorRef C, and 0 is the size of lead dimenson of Layout<RowMajor>,*/,
+        {reinterpret_cast<CutlassOutputType*>(C), n}/*TensorRef D, and n is the size of lead dimenson of Layout<RowMajor>,@#为什么是0,参考cutlass@btv3.5.0/..gemm_bias_relu.cu中的注释*/, 
+        gemm_config.split_k_factor/*@#quant @%性能 CutlassGemmConfig中的各个配置都是在profiler对一群candidate_config做性能搜索而得到*/,
+        {ElementAccumulator(alpha), output_op_beta}/*LinearCombination::Param because of above EpilogueOp define*/);//cpp/tensorrt_llm/cutlass_extensions/include/cutlass_extensions/gemm/kernel/fpA_intB_gemm.h:145
 
     Gemm gemm;
     if (gemm.get_workspace_size(args) > workspace_bytes)
@@ -341,7 +342,7 @@ void dispatch_gemm_to_cutlass(ActivationType const* A, WeightType const* B, Scal
         // Note that SIMT configs are omitted here since they are not supported for fpA_intB.
         // We also only instantiate configs here where threadblockShapeM == warpShapeM since those usually perform the
         // best for mixed type gemms.
-        constexpr int tile_shape_k = 128 * 8 / cutlass::sizeof_bits<ActivationType>::value;
+        constexpr int tile_shape_k = 128 * 8 / cutlass::sizeof_bits<ActivationType>::value;//???为什么乘8?如果是int4或fp16也是乘8?那个128是Byte么?难道不是元素个数?
         switch (gemm_config.tile_config)
         {
         case tkc::CutlassTileConfig::CtaShape16x128x64_WarpShape16x32x64://@#???可否定义其它的blk til/wrp til尺寸
