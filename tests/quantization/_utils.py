@@ -106,7 +106,9 @@ def woq_assert_near_eq(ref, act, wTypeId):
 
     max_val = torch.max(abs(ref)).item()
     atol = (max_val * quant_range_scale) * 1.5  # allow for rounding
+    print("----------------------------------------------------------")
     torch.testing.assert_close(ref.cpu(), act.cpu(), atol=atol, rtol=1e-7)
+    # torch.testing.assert_close(ref.cpu(), act.cpu(), atol=1e-10, rtol=0) @# can pass atol=1e-7 but not 1e-10
 
 
 def gt_matmul_smooth_quant(mat1, mat2, scale_a_, scale_b_, dtype, bias=None):

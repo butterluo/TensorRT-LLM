@@ -90,7 +90,7 @@ void apply_per_channel_scale_kernel_launcher_(
 }
 
 template <typename T_in, typename T_out>
-void apply_per_channel_scale_kernel_launcher(
+void apply_per_channel_scale_kernel_launcher(//@#quant gptq和awq都用了分组量化以提升精度,所以在反量化前要处理分组
     T_out* smoothed_act, T_in const* act, T_in const* per_channel_scale, int rows, int cols, cudaStream_t stream)
 {
     int elems = rows * cols;

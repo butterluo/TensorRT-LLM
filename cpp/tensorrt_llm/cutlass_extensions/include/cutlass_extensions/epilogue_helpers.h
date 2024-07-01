@@ -99,7 +99,7 @@ struct Epilogue<ElementType, ElementsPerVectorAccess, ElementAccumulator, Epilog
         cutlass::FloatRoundStyle::round_to_nearest, true>;
 };
 
-template <typename ElementType, int ElementsPerVectorAccess, typename ElementAccumulator>//@#qwn
+template <typename ElementType, int ElementsPerVectorAccess, typename ElementAccumulator>//@#quant
 struct Epilogue<ElementType, ElementsPerVectorAccess, ElementAccumulator, EpilogueOpBias>
 {
     using Op = cutlass::epilogue::thread::LinearCombination<ElementType, ElementsPerVectorAccess, ElementAccumulator,

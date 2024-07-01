@@ -493,7 +493,7 @@ struct GemmFpAIntB
             semaphore.wait(threadblock_tile_offset.k());
         }
 
-        // Execute the epilogue operator to update the destination tensor.
+        // Execute the epilogue operator to update the destination tensor. @#quant eplg
         epilogue(output_op, iterator_D, accumulators, iterator_C);
 
         //

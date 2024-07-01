@@ -212,7 +212,7 @@ void exec_cutlass_kernel(
     using AType = typename cutlassTypeMapper<KT>::AType;
     static constexpr cutlass::WeightOnlyQuantOp QuantOp = cutlassTypeMapper<KT>::QuantOp;
     void* act = params.act;
-    if (params.act_scale)
+    if (params.act_scale)   //@#quant
     {
         tensorrt_llm::kernels::apply_per_channel_scale_kernel_launcher<AType, AType>(
             reinterpret_cast<AType*>(scaled_act), reinterpret_cast<AType const*>(params.act),
@@ -224,7 +224,7 @@ void exec_cutlass_kernel(
         runner.gemm(
             act, params.weight, params.scales, params.out, params.m, params.n, params.k, config, ws, ws_size, stream);
     }
-    else if (QuantOp == cutlass::WeightOnlyQuantOp::FINEGRAINED_SCALE_AND_ZEROS)
+    else if (QuantOp == cutlass::WeightOnlyQuantOp::FINEGRAINED_SCALE_AND_ZEROS)   //@#quant
     {
         runner.gemm(act, params.weight, params.scales, params.zeros, params.bias, params.out, params.m, params.n,
             params.k, params.groupsize, config, ws, ws_size, stream);
@@ -273,7 +273,7 @@ float run_cutlass_kernel(wo::Params& params, int warmup, int iter)
         if (time < fast_time)
         {
             fast_time = time;
-            best_config = config;
+            best_config = config;                     //@#quant
         }
     }
 
@@ -284,7 +284,7 @@ float run_cutlass_kernel(wo::Params& params, int warmup, int iter)
     cudaEventRecord(begin, s);
     for (int i = 0; i < iter; ++i)
     {
-        exec_cutlass_kernel<KT>(scaled_act.data(), gemm, params, best_config, ws_ptr, ws_bytes, s);
+        exec_cutlass_kernel<KT>(scaled_act.data(), gemm, params, best_config, ws_ptr, ws_bytes, s);  //@#quant
     }
     if (ws_ptr)
         cudaFree(ws_ptr);
