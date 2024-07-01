@@ -109,7 +109,7 @@ struct DetagOperator<OpMultiplyAddDequantizeInterleavedBToA_fine_scale>
     static constexpr WeightOnlyQuantOp QuantOp = WeightOnlyQuantOp::FINEGRAINED_SCALE_ONLY;
 };
 
-template <>
+template <>//@#quant bf16int4
 struct DetagOperator<OpMultiplyAddDequantizeInterleavedBToA_fine_scalebias>
 {
     using Operator = OpMultiplyAddDequantizeInterleavedBToA;

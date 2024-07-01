@@ -92,7 +92,7 @@ template <
     /// when output layout is interleaved.
     bool AccumulatorsInRowMajor = false,
     /// Used for partial specialization
-    typename Enable = bool>
+    typename Enable = bool>//@#quant
 class MmaTensorOpComputeBWithF16
 {
 public:

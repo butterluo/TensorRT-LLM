@@ -13,12 +13,16 @@
 # License for the specific language governing permissions and limitations under
 # the License. GoogleTest Preparation - Code block copied from
 # https://google.github.io/googletest/quickstart-cmake.html
-include(FetchContent)
-FetchContent_Declare(
-  googletest
-  GIT_REPOSITORY https://github.com/google/googletest.git
-  GIT_TAG release-1.12.1)
-FetchContent_MakeAvailable(googletest)
+
+# include(FetchContent)
+# FetchContent_Declare(
+#   googletest
+#   GIT_REPOSITORY https://github.com/google/googletest.git
+#   GIT_TAG release-1.12.1)
+# FetchContent_MakeAvailable(googletest)
+#@# change above into below
+list(APPEND CMAKE_MODULE_PATH "${GOOGLETEST_HOME}/googletest/cmake")
+
 include(GoogleTest)
 
 # On Windows major version is appended to nvinfer libs.

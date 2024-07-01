@@ -213,7 +213,7 @@ template <
     /// Operator performed by GEMM
     typename Operator_,
     /// Use zfill or predicate for out-of-bound cp.async
-    SharedMemoryClearOption SharedMemoryClear>
+    SharedMemoryClearOption SharedMemoryClear>               //@#quant sm86 bf16int4 IsColumnMajorTileInterleave<LayoutB>
 struct DqMma<ElementA, LayoutA, kAlignmentA, ElementB, LayoutB, kAlignmentB, ElementScale, LayoutScale, kAlignmentScale,
     ElementAccumulator, layout::RowMajor, OperatorClass, ArchTag, ThreadblockShape, WarpShape, InstructionShape,
     kStages, Operator_, SharedMemoryClear,
@@ -245,7 +245,7 @@ struct DqMma<ElementA, LayoutA, kAlignmentA, ElementB, LayoutB, kAlignmentB, Ele
     // Mma core does not depend on stages, so pass in at least 3 here to mma multistage pieces are created
     using MmaCore = typename cutlass::gemm::threadblock::DefaultMmaCore<ThreadblockShape, WarpShape, InstructionShape,
         ElementA, LayoutA, ElementB, layout::ColumnMajor, ElementAccumulator, layout::RowMajor, OperatorClass,
-        std::max(kStages, 3), Operator, false, CacheOpA, CacheOpB>;
+        std::max(kStages, 3), Operator, false, CacheOpA, CacheOpB>;//@#quant cutlass/gemm/threadblock/default_mma_core_sm80.h
 
     // Define iterators over tiles from the A operand
     using ThreadMapA = typename MmaCore::IteratorThreadMapA;
@@ -289,7 +289,7 @@ public:
 
     using Converter = FastInterleavedAndBiasedNumericArrayConverter<ElementScale, ElementB,
         MmaCore::MmaPolicy::Operator::FragmentB::kElements>;
-
+    //@#quant MmaCore::MmaPolicy::Operator is default_mma_tensor_op.h.DefaultMmaTensorOp::Type which is mma_tensorop_compute_B_with_f16.h
     // Define the threadblock-scoped pipelined matrix multiply
     using ThreadblockMma = cutlass::gemm::threadblock::DqMmaMultistage<typename MmaCore::Shape, IteratorA,
         typename MmaCore::SmemIteratorA, MmaCore::kCacheOpA, IteratorB, typename MmaCore::SmemIteratorB,

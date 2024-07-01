@@ -72,7 +72,7 @@ template <
     int PartitionsK,
     /// Store the accumulators in row major or column major.  Row major is used
     /// when output layout is interleaved.
-    bool AccumulatorsInRowMajor>
+    bool AccumulatorsInRowMajor>//@#quant bf16int4 due to OpMultiplyAddDequantizeInterleavedBToA
 struct DefaultMmaTensorOp<WarpShape_, InstructionShape_, ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC,
     arch::OpMultiplyAddDequantizeInterleavedBToA, PartitionsK, AccumulatorsInRowMajor>
 {
@@ -89,7 +89,7 @@ private:
 
 public:
     using Policy = cutlass::gemm::warp::MmaTensorOpPolicy<
-        cutlass::arch::Mma<InstructionShape_, 32, ElementA, cutlass::layout::RowMajor, ElementA,
+        cutlass::arch::Mma<InstructionShape_, 32, ElementA, cutlass::layout::RowMajor, ElementA/*typB, int4 covert to bf16*/,
             cutlass::layout::ColumnMajor, ElementC, cutlass::layout::RowMajor, arch::OpMultiplyAdd>,
         cutlass::MatrixShape<1, 1>>;
 

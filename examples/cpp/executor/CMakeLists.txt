@@ -80,7 +80,7 @@ if(${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL "11")
   )
 endif()
 
-if(${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL "11.8")
+if(${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL "11.8")  #@#虽然rtx不支持FP8,但若ENABLE_FP8=0时依然有很多源码用到fp8,所以无法禁用
   add_definitions("-DENABLE_FP8")
   message(
     STATUS
@@ -110,7 +110,9 @@ target_link_libraries(executorExampleBasic nvinfer_plugin_tensorrt_llm)
 
 # Advanced
 if(NOT TARGET cxxopts::cxxopts)
-  set(CXXOPTS_SRC_DIR ${TRTLLM_DIR}/3rdparty/cxxopts)
+  # set(CXXOPTS_SRC_DIR ${TRTLLM_DIR}/3rdparty/cxxopts)
+  #@# change above into below
+  set(CXXOPTS_SRC_DIR ${CXXOPTS_HOME})
   add_subdirectory(${CXXOPTS_SRC_DIR} ${CMAKE_CURRENT_BINARY_DIR}/cxxopts)
 endif()
 

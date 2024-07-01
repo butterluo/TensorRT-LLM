@@ -97,7 +97,7 @@ template <
     /// The quantization operator being used
     WeightOnlyQuantOp QuantOp_,
     /// Use zfill or predicate for out-of-bound cp.async
-    SharedMemoryClearOption SharedMemoryClear>
+    SharedMemoryClearOption SharedMemoryClear>//@#quant QuantOp_==WeightOnlyQuantOp::FINEGRAINED_SCALE_AND_ZEROS
 class DqMmaMultistage<Shape_, IteratorA_, SmemIteratorA_, CacheOpA, IteratorB_, SmemIteratorB_, CacheOpB,
     IteratorScale_, SmemIteratorScale_, ElementC_, LayoutC_, Policy_, Stages, TransformBAfterLDS_, QuantOp_,
     SharedMemoryClear, std::enable_if_t<isFinegrained(QuantOp_)>>

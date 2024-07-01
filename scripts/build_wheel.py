@@ -60,13 +60,13 @@ def main(build_type: str = "Release",
     os.chdir(project_dir)
     build_run = partial(run, shell=True, check=True)
 
-    if not (project_dir / "3rdparty/cutlass/.git").exists():
-        build_run('git submodule update --init --recursive')
+    # if not (project_dir / "3rdparty/cutlass/.git").exists():  @#MODIFY NOT git clone, use local ones instead
+    #     build_run('git submodule update --init --recursive')
     on_windows = platform.system() == "Windows"
-    requirements_filename = "requirements-dev-windows.txt" if on_windows else "requirements-dev.txt"
-    build_run(
-        f"\"{sys.executable}\" -m pip install -r {requirements_filename} --extra-index-url https://pypi.ngc.nvidia.com"
-    )
+    # requirements_filename = "requirements-dev-windows.txt" if on_windows else "requirements-dev.txt"
+    # build_run(
+    #     f"\"{sys.executable}\" -m pip install -r {requirements_filename} --extra-index-url https://pypi.ngc.nvidia.com"
+    # ) #@#MODIFY tmp comment this to avoid pip install tmp
     # Ensure TRT is installed on windows to prevent surprises.
     reqs = check_output([sys.executable, "-m", "pip", "freeze"])
     installed_packages = [r.decode().split("==")[0] for r in reqs.split()]
@@ -98,7 +98,7 @@ def main(build_type: str = "Release",
         # The Ninja CMake generator is used for our Windows build
         # (Easier than MSBuild to make compatible with our Docker image)
         cmake_generator = "-GNinja"
-
+    cmake_generator = "-GNinja" #@#MODIFY linux use ninja too
     if job_count is None:
         job_count = cpu_count()
 
@@ -350,3 +350,14 @@ if __name__ == "__main__":
                         help="Enable NVTX features.")
     args = parser.parse_args()
     main(**vars(args))
+"""
+虽然rtx不支持FP8,但若ENABLE_FP8=0时依然有很多源码用到fp8,所以无法禁用. 但在cuda>12时ENABLE_BF16和ENABLE_FP8会自动启用,所以无需在命令行明确指出
+即使ENABLE_MULTI_DEVICE=0也会链接到mpi,所以无法禁用,要装mpi&nccl否则报错
+@# 
+python3 ./scripts/build_wheel.py --cuda_architectures "80-real;86-real" --trt_root /usr/local/tensorrt --skip_building_wheel --build_type Debug --install --use_ccache --job_count 16 -D "ENABLE_MULTI_DEVICE=1" -D "NVTX_DISABLE=1" -D "BUILD_BENCHMARKS=0" -D "FAST_MATH=1" -D "CUTLASS_HOME=/home/SRC/MLSys/HPC/GPU/cutlass" -D "NVTX_HOME=/home/SRC/MLSys/HPC/GPU/NVTX" -D "JSON_HOME=/home/SRC/Lang/json" -D "CXXOPTS_HOME=/home/SRC/MLSys/HPC/GPU/NVTX" -D "GOOGLETEST_HOME=/home/SRC/MLSys/HPC/GPU/NVTX" -D "CMAKE_VERBOSE_MAKEFILE=ON" -D "CMAKE_EXPORT_COMPILE_COMMANDS:BOOL=TRUE" --clean
+
+下面选项可看情况添加:
+--clean 
+--cpp_only  cpp_only在bild_wheel.py中的设置会造成很多问题,最好不加
+
+"""

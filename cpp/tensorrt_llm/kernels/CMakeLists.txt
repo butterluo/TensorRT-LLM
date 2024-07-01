@@ -25,7 +25,7 @@ list(FILTER SRC_CU EXCLUDE REGEX "cutlass_kernels/.*")
 list(FILTER SRC_CPP EXCLUDE REGEX "contextFusedMultiHeadAttention/.*")
 list(FILTER SRC_CU EXCLUDE REGEX "contextFusedMultiHeadAttention/.*")
 list(FILTER SRC_CPP EXCLUDE REGEX "decoderMaskedMultiheadAttention/.*")
-list(FILTER SRC_CU EXCLUDE REGEX "decoderMaskedMultiheadAttention/.*")
+list(FILTER SRC_CU EXCLUDE REGEX "decoderMaskedMultiheadAttention/.*") #@#??? why exclude decoderMaskedMultiheadAttention
 
 if(ENABLE_MULTI_DEVICE EQUAL 0)
   list(FILTER SRC_CU EXCLUDE REGEX "customAllReduceKernels*.*cu$")

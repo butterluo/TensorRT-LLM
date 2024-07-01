@@ -102,7 +102,7 @@ void generic_mixed_gemm_kernelLauncher(ActivationType const* A, WeightType const
     using TaggedOperator = typename cutlass::arch::TagOperator<Operator, QuantOp>::TaggedOperator;//OpMultiplyAddDequantizeInterleavedBToA_fine_scalebias(cpp/tensorrt_llm/cutlass_extensions/include/cutlass_extensions/arch/mma.h)
 
     using GemmKernel_ = typename cutlass::gemm::kernel::DefaultGemm<CutlassActivationType/*typA*/, cutlass::layout::RowMajor,
-        MixedGemmArchTraits::ElementsPerAccessA/*alignmetA*/, CutlassWeightType/*typB*/, typename MixedGemmArchTraits::LayoutB,
+        MixedGemmArchTraits::ElementsPerAccessA/*alignmetA*/, CutlassWeightType/*typB*/, typename MixedGemmArchTraits::LayoutB/*ColumnMajorTileInterleave*/,
         MixedGemmArchTraits::ElementsPerAccessB, CutlassOutputType/*typC*/, cutlass::layout::RowMajor, ElementAccumulator/*type for internal accumulation*/,
         cutlass::arch::OpClassTensorOp/*Operator class tag*/, arch, ThreadblockShape, WarpShape/*@#和ThreadblockShape一样都在dispatch_gemm_to_cutlass()中定义好了*/,
         typename MixedGemmArchTraits::InstructionShape, EpilogueOp/*EpilogueOutputOp*/,

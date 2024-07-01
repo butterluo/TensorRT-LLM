@@ -218,7 +218,7 @@ template <
     /// Instruction-level tile size (concept: GemmShape)
     typename InstructionShape,
     /// Operation performed by GEMM
-    typename Operator>
+    typename Operator>//@#quant bf16int4 && stage=2
 struct DefaultMma<cutlass::bfloat16_t, LayoutA, kAlignmentA, uint4b_t, LayoutB, kAlignmentB, ElementAccumulator,
     layout::RowMajor, arch::OpClassTensorOp, ArchTag, ThreadblockShape, WarpShape, InstructionShape, 2, Operator>
 {
@@ -321,7 +321,7 @@ template <
     ///
     int kStages,
     /// Shared memory clear option
-    SharedMemoryClearOption SharedMemoryClear>
+    SharedMemoryClearOption SharedMemoryClear>//@#quant bf16int4 && stage!=2
 struct DefaultMma<cutlass::bfloat16_t, LayoutA, kAlignmentA, uint4b_t, LayoutB, kAlignmentB, ElementAccumulator,
     layout::RowMajor, arch::OpClassTensorOp, ArchTag, ThreadblockShape, WarpShape, InstructionShape, kStages, Operator,
     false, SharedMemoryClear>

@@ -39,6 +39,16 @@ option(FAST_MATH "Compiling in fast math mode" OFF)
 option(INDEX_RANGE_CHECK "Compiling with index range checks" OFF)
 option(USE_SHARED_NVRTC "Use shared NVRTC library instead of static" OFF)
 
+#@#MODIFY ADD START
+set(CUDNN_ROOT_DIR $ENV{CUDNN_ROOT_DIR})
+message(STATUS "TRT_HOME: $ENV{TRT_HOME}")
+message(STATUS "CUDNN_ROOT_DIR: ${CUDNN_ROOT_DIR}")
+message(STATUS "CUTLASS_HOME: ${CUTLASS_HOME}")
+message(STATUS "NVTX_HOME: ${NVTX_HOME}")
+message(STATUS "CXXOPTS_HOME: ${CXXOPTS_HOME}")
+message(STATUS "GOOGLETEST_HOME: ${GOOGLETEST_HOME}")
+#@# ADD END
+
 if(NVTX_DISABLE)
   add_compile_definitions("NVTX_DISABLE")
   message(STATUS "NVTX is disabled")
@@ -245,18 +255,30 @@ endif()
 get_filename_component(TRT_LLM_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR} PATH)
 
 set(3RDPARTY_DIR ${TRT_LLM_ROOT_DIR}/3rdparty)
-include_directories(
-  ${CUDAToolkit_INCLUDE_DIRS}
-  ${CUDNN_ROOT_DIR}/include
-  ${NCCL_INCLUDE_DIR}
-  ${3RDPARTY_DIR}/cutlass/include
-  ${3RDPARTY_DIR}/cutlass/tools/util/include
-  ${3RDPARTY_DIR}/NVTX/include
-  ${3RDPARTY_DIR}/json/include)
+# include_directories(
+#   ${CUDAToolkit_INCLUDE_DIRS}
+#   ${CUDNN_ROOT_DIR}/include
+#   ${NCCL_INCLUDE_DIR}
+#   ${3RDPARTY_DIR}/cutlass/include
+#   ${3RDPARTY_DIR}/cutlass/tools/util/include
+#   ${3RDPARTY_DIR}/NVTX/include
+#   ${3RDPARTY_DIR}/json/include)
+#@# Change above into below
+  include_directories(
+    ${CUDAToolkit_INCLUDE_DIRS}
+    ${CUTLASS_HOME}/include
+    ${CUTLASS_HOME}/tools/util/include
+    ${NVTX_HOME}/c/include
+    ${JSON_HOME}/include)
+
 
 # TRT dependencies
-set_ifndef(TRT_LIB_DIR ${CMAKE_BINARY_DIR})
-set_ifndef(TRT_INCLUDE_DIR /usr/include/${CMAKE_SYSTEM_PROCESSOR}-linux-gnu)
+# set_ifndef(TRT_LIB_DIR ${CMAKE_BINARY_DIR})
+# set_ifndef(TRT_INCLUDE_DIR /usr/include/${CMAKE_SYSTEM_PROCESSOR}-linux-gnu)
+#@#MODIFY change above into below
+set_ifndef(TRT_LIB_DIR $ENV{TRT_HOME}/lib)
+set_ifndef(TRT_INCLUDE_DIR $ENV{TRT_HOME}/include)
+
 set(TRT_LIB nvinfer)
 
 # On Windows major version is appended to nvinfer libs.
@@ -276,7 +298,7 @@ if(${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL "11")
   )
 endif()
 
-if(${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL "11.8")
+if(${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL "11.8")  #@# 虽然rtx不支持FP8,但若ENABLE_FP8=0时依然有很多源码用到fp8,所以无法禁用
   add_definitions("-DENABLE_FP8")
   message(
     STATUS
