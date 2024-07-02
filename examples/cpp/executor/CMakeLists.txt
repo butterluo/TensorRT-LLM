@@ -80,13 +80,13 @@ if(${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL "11")
   )
 endif()
 
-if(${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL "11.8")  #@#虽然rtx不支持FP8,但若ENABLE_FP8=0时依然有很多源码用到fp8,所以无法禁用
-  add_definitions("-DENABLE_FP8")
-  message(
-    STATUS
-      "CUDA_VERSION ${CUDA_VERSION} is greater or equal than 11.8, enable -DENABLE_FP8 flag"
-  )
-endif()
+# if(${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL "11.8")  #@#虽然rtx不支持FP8,但若ENABLE_FP8=0时依然有很多源码用到fp8,所以无法禁用
+#   add_definitions("-DENABLE_FP8")
+#   message(
+#     STATUS
+#       "CUDA_VERSION ${CUDA_VERSION} is greater or equal than 11.8, enable -DENABLE_FP8 flag"
+#   )
+# endif()
 
 # tensorrt_llm shared lib
 add_library(tensorrt_llm SHARED IMPORTED)

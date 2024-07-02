@@ -77,7 +77,7 @@ struct __align__(16) bf16_8_t
 };
 #endif
 
-#ifdef ENABLE_FP8
+// #ifdef ENABLE_FP8  //@#BUG some file still use convert_to_fp8 even though ENALBE_FP8=0
 using fp8_2_t = __nv_fp8x2_e4m3;
 using fp8_4_t = __nv_fp8x4_e4m3;
 
@@ -88,7 +88,7 @@ struct __align__(8) fp8_8_t
     __nv_fp8x2_e4m3 z;
     __nv_fp8x2_e4m3 w;
 };
-#endif
+// #endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -175,7 +175,7 @@ struct num_elems<bf16_8_t>
 };
 #endif
 
-#ifdef ENABLE_FP8
+// #ifdef ENABLE_FP8  //@#BUG some file still use convert_to_fp8 even though ENALBE_FP8=0
 template <>
 struct num_elems<__nv_fp8_e4m3>
 {
@@ -199,7 +199,7 @@ struct num_elems<fp8_8_t>
 {
     static constexpr int value = 8;
 };
-#endif
+// #endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -236,7 +236,7 @@ struct packed_type<int8_t, 8>
     using type = int64_t;
 };
 
-#ifdef ENABLE_FP8
+// #ifdef ENABLE_FP8 //@#BUG some file still use convert_to_fp8 even though ENALBE_FP8=0
 
 template <>
 struct packed_type<__nv_fp8_e4m3, 1>
@@ -261,7 +261,7 @@ struct packed_type<__nv_fp8_e4m3, 8>
 {
     using type = fp8_8_t;
 };
-#endif // ENABLE_FP8
+// #endif // ENABLE_FP8
 
 template <>
 struct packed_type<uint16_t, 2>
@@ -399,7 +399,7 @@ inline __device__ float4 add(float4 a, float4 b)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#ifdef ENABLE_FP8
+// #ifdef ENABLE_FP8  //@#BUG some file still use convert_to_fp8 even though ENALBE_FP8=0
 inline __device__ Float8_ add(Float8_ a, Float8_ b)
 {
     Float8_ c;
@@ -409,7 +409,7 @@ inline __device__ Float8_ add(Float8_ a, Float8_ b)
     c.w = add(a.w, b.w);
     return c;
 }
-#endif
+// #endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -561,12 +561,12 @@ inline __device__ float add(float a, __nv_bfloat16 b)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#ifdef ENABLE_FP8
+// #ifdef ENABLE_FP8  //@#BUG some file still use convert_to_fp8 even though ENALBE_FP8=0
 inline __device__ float add(float a, __nv_fp8_e4m3 b)
 {
     return a + (float) (b);
 }
-#endif
+// #endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1191,7 +1191,7 @@ inline __device__ Float8_ fma(__nv_bfloat16 a, Float8_ fb, Float8_ fc)
 
 #endif // ENABLE_BF16
 
-#ifdef ENABLE_FP8
+// #ifdef ENABLE_FP8  //@#BUG some file still use convert_to_fp8 even though ENALBE_FP8=0
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1351,7 +1351,7 @@ inline __device__ Float8_ fma(__nv_bfloat16 a, fp8_8_t b, Float8_ fc)
     return fma(__bfloat162float(a), b, fc);
 }
 
-#endif // ENABLE_FP8
+// #endif // ENABLE_FP8
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -3528,7 +3528,7 @@ inline __device__ Float8_ float_from_int8(int64_t u)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#ifdef ENABLE_FP8
+// #ifdef ENABLE_FP8 //@#BUG some file still use convert_to_fp8 even though ENALBE_FP8=0
 inline __device__ void convert_to_fp8(__nv_fp8_e4m3* v, const __nv_bfloat16 u)
 {
     v[0] = __nv_fp8_e4m3(u);
@@ -3644,7 +3644,7 @@ inline __device__ void convert_to_fp8(fp8_8_t* v, const Float8_ u)
     v[0].z = fp8_2_t(u.z);
     v[0].w = fp8_2_t(u.w);
 }
-#endif // ENABLE_FP8
+// #endif // ENABLE_FP8
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 

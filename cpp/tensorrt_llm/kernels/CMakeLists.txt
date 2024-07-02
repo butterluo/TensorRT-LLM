@@ -26,6 +26,7 @@ list(FILTER SRC_CPP EXCLUDE REGEX "contextFusedMultiHeadAttention/.*")
 list(FILTER SRC_CU EXCLUDE REGEX "contextFusedMultiHeadAttention/.*")
 list(FILTER SRC_CPP EXCLUDE REGEX "decoderMaskedMultiheadAttention/.*")
 list(FILTER SRC_CU EXCLUDE REGEX "decoderMaskedMultiheadAttention/.*") #@#??? why exclude decoderMaskedMultiheadAttention
+list(FILTER SRC_CU EXCLUDE REGEX "unfusedAttentionKernels/.*") #@#MODIFY add to exclude unfusedAttentionKernels folder cause it still use fp8 even though the ENABLE_FP8=0
 
 if(ENABLE_MULTI_DEVICE EQUAL 0)
   list(FILTER SRC_CU EXCLUDE REGEX "customAllReduceKernels*.*cu$")

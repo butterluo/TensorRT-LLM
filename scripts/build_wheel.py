@@ -354,7 +354,7 @@ if __name__ == "__main__":
 虽然rtx不支持FP8,但若ENABLE_FP8=0时依然有很多源码用到fp8,所以无法禁用. 但在cuda>12时ENABLE_BF16和ENABLE_FP8会自动启用,所以无需在命令行明确指出
 即使ENABLE_MULTI_DEVICE=0也会链接到mpi,所以无法禁用,要装mpi&nccl否则报错
 @# 
-python3 ./scripts/build_wheel.py --cuda_architectures "80-real;86-real" --trt_root /usr/local/tensorrt --skip_building_wheel --build_type Debug --install --use_ccache --job_count 12 -D "ENABLE_MULTI_DEVICE=1" -D "NVTX_DISABLE=1" -D "BUILD_BENCHMARKS=0" -D "FAST_MATH=1" -D "CUTLASS_HOME=/home/SRC/MLSys/HPC/GPU/cutlass" -D "NVTX_HOME=/home/SRC/MLSys/HPC/GPU/NVTX" -D "JSON_HOME=/home/SRC/Lang/json" -D "CXXOPTS_HOME=/home/SRC/Lang/cxxopts" -D "GOOGLETEST_HOME=/home/SRC/Lang/googletest" -D "CMAKE_VERBOSE_MAKEFILE=ON" -D "CMAKE_EXPORT_COMPILE_COMMANDS:BOOL=TRUE" --clean
+python3 ./scripts/build_wheel.py --cuda_architectures "80-real;86-real" --trt_root /usr/local/tensorrt --skip_building_wheel --build_type Debug --install --use_ccache --job_count 16 -D "ENABLE_MULTI_DEVICE=0" -D "ENABLE_FP8=0" -D "NVTX_DISABLE=1" -D "BUILD_BENCHMARKS=0" -D "FAST_MATH=1" -D "CUTLASS_HOME=/home/SRC/MLSys/HPC/GPU/cutlass" -D "NVTX_HOME=/home/SRC/MLSys/HPC/GPU/NVTX" -D "JSON_HOME=/home/SRC/Lang/json" -D "CXXOPTS_HOME=/home/SRC/Lang/cxxopts" -D "GOOGLETEST_HOME=/home/SRC/Lang/googletest" -D "CMAKE_VERBOSE_MAKEFILE=ON" -D "CMAKE_EXPORT_COMPILE_COMMANDS:BOOL=TRUE" --clean
 
 下面选项可看情况添加:
 --clean 

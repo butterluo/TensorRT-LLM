@@ -298,13 +298,13 @@ if(${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL "11")
   )
 endif()
 
-if(${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL "11.8")  #@# 虽然rtx不支持FP8,但若ENABLE_FP8=0时依然有很多源码用到fp8,所以无法禁用
-  add_definitions("-DENABLE_FP8")
-  message(
-    STATUS
-      "CUDAToolkit_VERSION ${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR} is greater or equal than 11.8, enable -DENABLE_FP8 flag"
-  )
-endif()
+# if(${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL "11.8")  #@# 虽然rtx不支持FP8,但若ENABLE_FP8=0时依然有很多源码用到fp8,所以无法禁用
+#   add_definitions("-DENABLE_FP8")
+#   message(
+#     STATUS
+#       "CUDAToolkit_VERSION ${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR} is greater or equal than 11.8, enable -DENABLE_FP8 flag"
+#   )
+# endif()
 
 if(ENABLE_MULTI_DEVICE)
   # MPI MPI isn't used until tensorrt_llm/CMakeLists.txt is invoked. However, if
@@ -334,10 +334,14 @@ endif()
 #@#MODIFY add START
 # set(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG}  -Wall -fno-default-inline -fno-inline")
 # set(CMAKE_C_FLAGS_DEBUG    "${CMAKE_C_FLAGS_DEBUG}    -Wall -fno-default-inline -fno-inline")
+set(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG} -mcmodel=large")
 set(CMAKE_C_FLAGS_DEBUG    "${CMAKE_C_FLAGS_DEBUG} ${CMAKE_CXX_FLAGS_DEBUG}")
 # set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -O0 -G -Xcompiler -Wall  --ptxas-options=-v --resource-usage")
 # set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -Og -G -Xcompiler -Wall -Xptxas=-O0 -Xptxas=-disable-optimizer-consts")
-set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -G")
+# set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -G -mcmodel=large -Xcompiler -mcmodel=large")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -mcmodel=large") #@# -mcmodel=large can handle big lib generation refer to : https://github.com/MegEngine/MegEngine/blob/master/CMakeLists.txt and https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html 
+set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -mcmodel=large") #@# BUT it NOT help to solve the 'PC-relative offset overflow in PLT entry' problem
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}       -mcmodel=large")
 #@#END
 
 set(CMAKE_CXX_FLAGS

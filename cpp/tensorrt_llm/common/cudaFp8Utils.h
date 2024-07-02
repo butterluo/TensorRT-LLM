@@ -15,7 +15,7 @@
  */
 
 #pragma once
-
+#include <cuda_fp8.h>  //@#BUGFIX some file still need cuda_fp8.h even though ENABLE_FP8=0
 #ifdef ENABLE_FP8
 #include <cuda_fp8.h>
 #include <cuda_runtime.h>
