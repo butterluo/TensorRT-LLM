@@ -27,7 +27,7 @@ namespace tensorrt_llm
 {
 namespace common
 {
-#ifdef ENABLE_FP8
+// #ifdef ENABLE_FP8     //@#BUGFIX some file still need cuda_fp8.h even though ENABLE_FP8=0
 
 constexpr int CTA_SIZE = 256;
 
@@ -431,6 +431,6 @@ DEFINE_INVOKE_QUANTIZE_MATRIX(__nv_bfloat16, __nv_bfloat16, __nv_fp8_e4m3);
 #endif
 #endif
 
-#endif // ENABLE_FP8
+// #endif // ENABLE_FP8
 } // namespace common
 } // namespace tensorrt_llm

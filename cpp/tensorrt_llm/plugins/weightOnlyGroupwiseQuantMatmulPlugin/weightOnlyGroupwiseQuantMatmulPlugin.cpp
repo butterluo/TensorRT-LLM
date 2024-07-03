@@ -146,6 +146,7 @@ void WeightOnlyGroupwiseQuantMatmulPlugin::init(nvinfer1::DataType type, int qua
     {
         if (quant_algo & FP8_ALPHA)
         {
+#ifdef ENABLE_FP8    //@#BUG some file still need cuda_fp8.h even though ENABLE_FP8=0
             // Ada & Hopper style kernels
             if (mArch < 89)
             {
@@ -165,6 +166,9 @@ void WeightOnlyGroupwiseQuantMatmulPlugin::init(nvinfer1::DataType type, int qua
                     = std::make_shared<tensorrt_llm::kernels::cutlass_kernels::CutlassFpAIntBGemmRunner<__nv_fp8_e4m3,
                         cutlass::uint4b_t, cutlass::WeightOnlyQuantOp::FINEGRAINED_SCALE_ONLY, half, half, half>>();
             }
+#else
+                TLLM_THROW("********************ENABLE_FP8 is FALSE******************");
+#endif
         }
         else
         {
@@ -385,9 +389,13 @@ int WeightOnlyGroupwiseQuantMatmulPlugin::enqueue(nvinfer1::PluginTensorDesc con
         {
             if (mQuantAlgo & FP8_ALPHA)
             {
+#ifdef ENABLE_FP8    //@#BUG some file still need cuda_fp8.h even though ENABLE_FP8=0
                 tensorrt_llm::kernels::apply_per_channel_scale_kernel_launcher<half, __nv_fp8_e4m3>(
                     reinterpret_cast<__nv_fp8_e4m3*>(workspace), reinterpret_cast<half const*>(inputs[0]),
                     reinterpret_cast<half const*>(inputs[mPreQuantScaleInputIdx]), m, k, stream);
+#else
+                TLLM_THROW("********************ENABLE_FP8 is FALSE******************");
+#endif
             }
             else
             {
@@ -401,9 +409,13 @@ int WeightOnlyGroupwiseQuantMatmulPlugin::enqueue(nvinfer1::PluginTensorDesc con
         {
             if (mQuantAlgo & FP8_ALPHA)
             {
+#ifdef ENABLE_FP8    //@#BUG some file still need cuda_fp8.h even though ENABLE_FP8=0
                 tensorrt_llm::kernels::apply_per_channel_scale_kernel_launcher<__nv_bfloat16, __nv_fp8_e4m3>(
                     reinterpret_cast<__nv_fp8_e4m3*>(workspace), reinterpret_cast<__nv_bfloat16 const*>(inputs[0]),
                     reinterpret_cast<__nv_bfloat16 const*>(inputs[mPreQuantScaleInputIdx]), m, k, stream);
+#else
+                TLLM_THROW("********************ENABLE_FP8 is FALSE******************");
+#endif
             }
             else
             {

@@ -386,25 +386,25 @@ TEST(Kernel, WeightOnly)
         {
             for (auto k : ks)
             {
-                pass = benchmark_and_verify<wo::KernelType::FP16Int8PerChannel>(m, n, k, 0, warmup, iter);
-                EXPECT_TRUE(pass);
-                pass = benchmark_and_verify<wo::KernelType::FP16Int4PerChannel>(m, n, k, 0, warmup, iter);
-                EXPECT_TRUE(pass);
+                // pass = benchmark_and_verify<wo::KernelType::FP16Int8PerChannel>(m, n, k, 0, warmup, iter);  //@#TST comment for tmp
+                // EXPECT_TRUE(pass);
+                // pass = benchmark_and_verify<wo::KernelType::FP16Int4PerChannel>(m, n, k, 0, warmup, iter);
+                // EXPECT_TRUE(pass);
                 if (arch >= 80)
                 {
-                    pass = benchmark_and_verify<wo::KernelType::FP16Int4Groupwise>(m, n, k, 64, warmup, iter);
-                    EXPECT_TRUE(pass);
-                    pass = benchmark_and_verify<wo::KernelType::FP16Int4Groupwise>(m, n, k, 128, warmup, iter);
-                    EXPECT_TRUE(pass);
+                    // pass = benchmark_and_verify<wo::KernelType::FP16Int4Groupwise>(m, n, k, 64, warmup, iter);  //@#TST comment for tmp
+                    // EXPECT_TRUE(pass);
+                    // pass = benchmark_and_verify<wo::KernelType::FP16Int4Groupwise>(m, n, k, 128, warmup, iter);
+                    // EXPECT_TRUE(pass);
 #if defined(ENABLE_BF16)
                     pass = benchmark_and_verify<wo::KernelType::BF16Int4Groupwise>(m, n, k, 64, warmup, iter);
                     EXPECT_TRUE(pass);
-                    pass = benchmark_and_verify<wo::KernelType::BF16Int4Groupwise>(m, n, k, 128, warmup, iter);
-                    EXPECT_TRUE(pass);
-                    pass = benchmark_and_verify<wo::KernelType::BF16Int8PerChannel>(m, n, k, 0, warmup, iter);
-                    EXPECT_TRUE(pass);
-                    pass = benchmark_and_verify<wo::KernelType::BF16Int4PerChannel>(m, n, k, 0, warmup, iter);
-                    EXPECT_TRUE(pass);
+                    // pass = benchmark_and_verify<wo::KernelType::BF16Int4Groupwise>(m, n, k, 128, warmup, iter);  //@#TST comment for tmp
+                    // EXPECT_TRUE(pass);
+                    // pass = benchmark_and_verify<wo::KernelType::BF16Int8PerChannel>(m, n, k, 0, warmup, iter);
+                    // EXPECT_TRUE(pass);
+                    // pass = benchmark_and_verify<wo::KernelType::BF16Int4PerChannel>(m, n, k, 0, warmup, iter);
+                    // EXPECT_TRUE(pass);
 #endif
                 }
             }

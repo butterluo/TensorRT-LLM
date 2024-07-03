@@ -321,7 +321,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CUDA_STANDARD ${CMAKE_CXX_STANDARD})
 
 if(UNIX)
-  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Og")
+  # set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Og")#@#MODIFY change this into below
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
 endif()
 
 # Note: The following are desirable settings that should be enabled if we
@@ -332,13 +333,15 @@ endif()
 # set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -G")
 
 #@#MODIFY add START
+message(STATUS "CMAKE_CUDA_FLAGS_RELWITHDEBINFO: ${CMAKE_CUDA_FLAGS_RELWITHDEBINFO}")
 # set(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG}  -Wall -fno-default-inline -fno-inline")
 # set(CMAKE_C_FLAGS_DEBUG    "${CMAKE_C_FLAGS_DEBUG}    -Wall -fno-default-inline -fno-inline")
-set(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG} -mcmodel=large")
-set(CMAKE_C_FLAGS_DEBUG    "${CMAKE_C_FLAGS_DEBUG} ${CMAKE_CXX_FLAGS_DEBUG}")
+set(CMAKE_CXX_FLAGS  "-mcmodel=large ${CMAKE_CXX_FLAGS} -mcmodel=large")
+set(CMAKE_C_FLAGS    "-mcmodel=large ${CMAKE_C_FLAGS} ${CMAKE_CXX_FLAGS}")
 # set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -O0 -G -Xcompiler -Wall  --ptxas-options=-v --resource-usage")
 # set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -Og -G -Xcompiler -Wall -Xptxas=-O0 -Xptxas=-disable-optimizer-consts")
-# set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -G -mcmodel=large -Xcompiler -mcmodel=large")
+set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -G -O0 -Xcompiler -O0  -mcmodel=medium -Wl,--no-relax -Xcompiler -mcmodel=medium -Xlinker --no-relax ")
+# set(CMAKE_CUDA_FLAGS "-mcmodel=large  ${CMAKE_CUDA_FLAGS} -mcmodel=large -Xcompiler -mcmodel=large")
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -mcmodel=large") #@# -mcmodel=large can handle big lib generation refer to : https://github.com/MegEngine/MegEngine/blob/master/CMakeLists.txt and https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html 
 set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -mcmodel=large") #@# BUT it NOT help to solve the 'PC-relative offset overflow in PLT entry' problem
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}       -mcmodel=large")
@@ -352,7 +355,7 @@ set(CMAKE_CXX_FLAGS
 # be found in
 # https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html#index-mcmodel_003dmedium-1
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcmodel=medium  -Wl,--no-relax")
+  # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcmodel=medium  -Wl,--no-relax") #@#BUG comment to avoid 'relocation truncated to fit' problem
 endif()
 
 # Disable deprecated declarations warnings

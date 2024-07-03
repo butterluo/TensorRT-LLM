@@ -14,17 +14,17 @@
 # the License. GoogleTest Preparation - Code block copied from
 # https://google.github.io/googletest/quickstart-cmake.html
 
-# include(FetchContent)
-# FetchContent_Declare(
-#   googletest
-#   GIT_REPOSITORY https://github.com/google/googletest.git
-#   GIT_TAG release-1.12.1)
-# FetchContent_MakeAvailable(googletest)
+include(FetchContent)
+FetchContent_Declare(
+  googletest
+  GIT_REPOSITORY https://github.com/google/googletest.git
+  GIT_TAG release-1.12.1)
+FetchContent_MakeAvailable(googletest)
 #@# change above into below
-list(APPEND CMAKE_MODULE_PATH "${GOOGLETEST_HOME}/googletest/cmake")
-include_directories("${GOOGLETEST_HOME}/googletest/include")
-list(APPEND CMAKE_MODULE_PATH "${GOOGLETEST_HOME}/googlemock/cmake")
-include_directories("${GOOGLETEST_HOME}/googlemock/include")
+# list(APPEND CMAKE_MODULE_PATH "${GOOGLETEST_HOME}/googletest/cmake")
+# include_directories("${GOOGLETEST_HOME}/googletest/include")
+# list(APPEND CMAKE_MODULE_PATH "${GOOGLETEST_HOME}/googlemock/cmake")
+# include_directories("${GOOGLETEST_HOME}/googlemock/include")
 
 include(GoogleTest)
 
