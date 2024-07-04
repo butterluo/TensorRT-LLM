@@ -147,7 +147,7 @@ public:
     using ArchTag = arch::Sm80;
 
     using Dequantizer = warp::MmaTensorOpDequantizer<Operator, typename Base::WarpGemm, Operand::kB, ElementScale,
-        LayoutScale, 32, QuantOp>;
+        LayoutScale, 32, QuantOp>;//@#
 
     /// Complex transform on A operand
     static ComplexTransform const kTransformA = Operator::kTransformA;
@@ -537,7 +537,7 @@ public:
         typename Dequantizer::FragmentScale warp_frag_scales;
         typename Dequantizer::FragmentZero warp_frag_zeros;
 
-        Operator warp_mma;
+        Operator warp_mma;//@#quant
 
         this->warp_tile_iterator_A_.set_kgroup_index(0);
         this->warp_tile_iterator_B_.set_kgroup_index(0);
@@ -606,7 +606,7 @@ public:
 
                 FragmentOperandB converted_frag_B_operand = Converter::convert(converted_frag_B);
                 run_warp_mma(warp_mma, accum, warp_frag_A[warp_mma_k % 2], converted_frag_B_operand, accum,
-                    warp_tileB_k_compute_offset);
+                    warp_tileB_k_compute_offset);//@#quant
 
                 // Issue global->shared copies for the this stage
                 if (warp_mma_k < Base::kWarpGemmIterations - 1)

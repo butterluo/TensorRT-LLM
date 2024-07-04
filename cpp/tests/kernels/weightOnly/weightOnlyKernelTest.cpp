@@ -215,7 +215,7 @@ void exec_cutlass_kernel(
     if (params.act_scale)   //@#quant
     {
         tensorrt_llm::kernels::apply_per_channel_scale_kernel_launcher<AType, AType>(
-            reinterpret_cast<AType*>(scaled_act), reinterpret_cast<AType const*>(params.act),
+            reinterpret_cast<AType*>(scaled_act)/*output*/, reinterpret_cast<AType const*>(params.act),
             reinterpret_cast<AType const*>(params.act_scale), params.m, params.k, stream);
         act = scaled_act;
     }

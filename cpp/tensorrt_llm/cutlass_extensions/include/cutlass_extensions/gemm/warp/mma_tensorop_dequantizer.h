@@ -93,7 +93,7 @@ template <
     /// Shape of the warp level matrix multiply (concept: GemmShape)
     typename Shape_,
     ///
-    WeightOnlyQuantOp QuantOp_>
+    WeightOnlyQuantOp QuantOp_>//@#quqnt
 class MmaTensorOpDequantizer<MmaOperator_, Shape_, Operand::kB, bfloat16_t, layout::RowMajor, 32, QuantOp_,
     typename platform::enable_if<MmaOperator_::ArchTag::kMinComputeCapability >= 80
         && platform::is_same<typename MmaOperator_::ArchMmaOperator::LayoutB, layout::ColumnMajor>::value>::type>
@@ -222,7 +222,7 @@ public:
 
     CUTLASS_DEVICE
     void dequantize(
-        FragmentDequantizedOperand& operand_frag, FragmentScale const& scale_frag, FragmentScale const& zero_frag)
+        FragmentDequantizedOperand& operand_frag, FragmentScale const& scale_frag, FragmentScale const& zero_frag)//@#
     {
 #if (defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 800) && defined(ENABLE_BF16))
         using _MmaOperandB = typename ArchMmaOperator::FragmentB;

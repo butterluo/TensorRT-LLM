@@ -184,7 +184,7 @@ void generic_mixed_gemm_kernelLauncher(ActivationType const* A, WeightType const
 
     int const ld_scale_zero = cutlass::isFinegrained(QuantOp) ? n : 0;
     ElementAccumulator output_op_beta = (biases == nullptr) ? ElementAccumulator(0.f) : ElementAccumulator(1.f);
-    typename Gemm::Arguments args({m, n, k}/*problem_size*/, group_size,
+    typename Gemm::Arguments/*GemmFpAIntB::Arguments*/ args({m, n, k}/*problem_size*/, group_size,
         {reinterpret_cast<CutlassActivationType*>(const_cast<ActivationType*>(A)), k},
         {reinterpret_cast<CutlassWeightType*>(const_cast<WeightType*>(B)), ldb},
         {reinterpret_cast<CutlassScaleZeroType*>(const_cast<ScaleZeroType*>(weight_scales)), ld_scale_zero},
