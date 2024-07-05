@@ -125,8 +125,11 @@ def _woq_groupwise_matmul(m,
                           has_bias,
                           group_size=128,
                           use_w4a8_awq=False):
-
-    torch.manual_seed(0)
+    seed = 0 
+    # original quant gemm version: 0(atol=1e-7),1(1e-6),131(1e-7)
+    # act + quant gemm: 0()
+    torch.manual_seed(seed)
+    print(f"***** seed: {seed} *****")
     activation_dtype = tensorrt_llm._utils.str_dtype_to_torch(
         activation_dtype_str)
 
@@ -199,6 +202,7 @@ def _woq_groupwise_matmul(m,
         activation = torch.mul(activation, pre_quant_scale)
 
     ref = _utils.woq_groupwise_gt_matmul(activation, ref_th_weight, bias)
+    ref = activation + ref
     _utils.woq_assert_near_eq(ref, output, 2)
     print("************DONE****************")
 
@@ -251,4 +255,4 @@ def test_matmul_bf16_int4_input(m,
 #                                group_size)
 
 if __name__ == '__main__':
-    test_matmul_bf16_int4_input(64, 2048, 1024, 'bfloat16', False, False, False, 64)
+    test_matmul_bf16_int4_input(64, 1024, 1024, 'bfloat16', False, False, False, 64)
