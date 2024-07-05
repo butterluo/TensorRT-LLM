@@ -23,8 +23,8 @@ from tensorrt_llm.quantization.functional import \
     weight_only_groupwise_quant_matmul
 
 
-from utils.util import (skip_pre_ada_unittest, skip_pre_ampere_unittest,
-                        skip_pre_hopper_unittest, unittest_name_func)
+# from utils.util import (skip_pre_ada_unittest, skip_pre_ampere_unittest,
+#                         skip_pre_hopper_unittest, unittest_name_func)
 
 tensorrt_llm.logger.set_level('verbose')
 
