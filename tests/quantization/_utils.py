@@ -96,7 +96,11 @@ def woq_gt_matmul(m,
 
     return ref
 
-np.set_printoptions(threshold=np.inf)
+np.set_printoptions(
+    threshold=np.inf,
+    precision=1,
+    suppress=True,
+    linewidth=64)
 def woq_assert_near_eq(ref, act, wTypeId):
     # match the scale in cpp/tensorrt_llm/kernels/cutlass_kernels/cutlass_preprocessors.cpp
     if wTypeId == 1:
@@ -112,10 +116,10 @@ def woq_assert_near_eq(ref, act, wTypeId):
     # torch.testing.assert_close(ref.cpu(), act.cpu(), atol=1e-2, rtol=0) #@# original quant gemm version can pass atol=1e-7 but not 1e-8
     ref_np = ref.float().cpu().numpy()
     act_np = act.float().cpu().numpy()
-    print(f">> {ref_np} <<<<")
+    print(f"\n\n>> {ref_np} <<<< \n\n\n\n\n\n\n\n\n\n\n\n")
     print(f"-> {act_np} <---")
     print(f"======================================================")
-    np.testing.assert_allclose(ref_np, act_np, atol=1.6e-2, rtol=1e-5, equal_nan=False, verbose=True)
+    np.testing.assert_allclose(ref_np, act_np, atol=1e-2, rtol=0, equal_nan=False, verbose=True)
 
 
 def gt_matmul_smooth_quant(mat1, mat2, scale_a_, scale_b_, dtype, bias=None):

@@ -183,15 +183,15 @@ void generic_mixed_gemm_kernelLauncher(ActivationType const* A, WeightType const
     }
 
     int const ld_scale_zero = cutlass::isFinegrained(QuantOp) ? n : 0;
-    // ElementAccumulator output_op_beta = (biases == nullptr) ? ElementAccumulator(0.f) : ElementAccumulator(1.f);
-    ElementAccumulator output_op_beta = ElementAccumulator(1.f); //@#TST change from above to test A+A*B
+    ElementAccumulator output_op_beta = (biases == nullptr) ? ElementAccumulator(0.f) : ElementAccumulator(1.f);
+    // ElementAccumulator output_op_beta = ElementAccumulator(1.f); //@#TST change from above to test A+A*B
     typename Gemm::Arguments/*GemmFpAIntB::Arguments*/ args({m, n, k}/*problem_size*/, group_size,
         {reinterpret_cast<CutlassActivationType*>(const_cast<ActivationType*>(A)), k},
         {reinterpret_cast<CutlassWeightType*>(const_cast<WeightType*>(B)), ldb},
         {reinterpret_cast<CutlassScaleZeroType*>(const_cast<ScaleZeroType*>(weight_scales)), ld_scale_zero},
         {reinterpret_cast<CutlassScaleZeroType*>(const_cast<ScaleZeroType*>(weight_zero_points)), ld_scale_zero},
-        // {reinterpret_cast<CutlassBiasType*>(const_cast<BiasType*>(biases)), 0}/*TensorRef C, and 0 is the size of lead dimenson of Layout<RowMajor>,*/,
-        {reinterpret_cast<CutlassBiasType*>(const_cast<BiasType*>(A)), n}/*@#TST change from above to test A+A*B*/,
+        {reinterpret_cast<CutlassBiasType*>(const_cast<BiasType*>(biases)), 0}/*TensorRef C, and 0 is the size of lead dimenson of Layout<RowMajor>,*/,
+        // {reinterpret_cast<CutlassBiasType*>(const_cast<BiasType*>(A)), n}/*@#TST change from above to test A+A*B*/,
         {reinterpret_cast<CutlassOutputType*>(C), n}/*TensorRef D, and n is the size of lead dimenson of Layout<RowMajor>,@#为什么是0,参考cutlass@btv3.5.0/..gemm_bias_relu.cu中的注释*/, 
         gemm_config.split_k_factor/*@#quant @%性能 CutlassGemmConfig中的各个配置都是在profiler对一群candidate_config做性能搜索而得到*/,
         {ElementAccumulator(alpha), output_op_beta}/*LinearCombination::Param because of above EpilogueOp define*/);//cpp/tensorrt_llm/cutlass_extensions/include/cutlass_extensions/gemm/kernel/fpA_intB_gemm.h:145

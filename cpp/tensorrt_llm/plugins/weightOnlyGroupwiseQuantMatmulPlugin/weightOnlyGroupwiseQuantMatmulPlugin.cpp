@@ -40,7 +40,7 @@ std::vector<nvinfer1::PluginField> WeightOnlyGroupwiseQuantMatmulPluginCreator::
 
 void WeightOnlyGroupwiseQuantGemmPluginProfiler::runTactic(int m, int n, int k,
     WeightOnlyGroupwiseQuantGemmPluginProfiler::Config const& tactic, char* workspace, cudaStream_t const& stream)
-{
+{//@# call from profileTacticForProblem()<profileTacticsForProblem()<profileTactics() of GemmPluginProfiler<Config, RunnerPtr, GemmIdType, GemmIdHashType>
     // Quantized weights are packed in FP16 format (INT4*4 -> FP16)
     int const originalN = n * FP16_INT4_RATIO;
     half* actPtr = reinterpret_cast<half*>(workspace);
@@ -73,7 +73,7 @@ void WeightOnlyGroupwiseQuantGemmPluginProfiler::runTactic(int m, int n, int k,
 }
 
 void WeightOnlyGroupwiseQuantGemmPluginProfiler::computeTmpSize(int maxM, int n, int k)
-{
+{//@#quant called from GemmPluginProfiler<Config, RunnerPtr, GemmIdType, GemmIdHashType>::profileTactics()
     // Quantized weights are packed in FP16 format (INT4*4 -> FP16)
     int const originalN = n * FP16_INT4_RATIO;
     std::vector<size_t> workspaces = {
@@ -91,7 +91,7 @@ void WeightOnlyGroupwiseQuantGemmPluginProfiler::computeTmpSize(int maxM, int n,
 
 std::vector<WeightOnlyGroupwiseQuantGemmPluginProfiler::Config> WeightOnlyGroupwiseQuantGemmPluginProfiler::getTactics(
     int m, int n, int k) const
-{
+{//@#quant called by profileTactics() of GemmPluginProfiler<Config, RunnerPtr, GemmIdType, GemmIdHashType>, before it call profileTacticsForProblem()
     return mRunner->getConfigs();
 }
 
@@ -243,7 +243,7 @@ nvinfer1::IPluginV2DynamicExt* WeightOnlyGroupwiseQuantMatmulPlugin::clone() con
 }
 
 void WeightOnlyGroupwiseQuantMatmulPlugin::configGemm()
-{
+{//@# called by initialize()
     mPluginProfiler->profileTactics(m_weightOnlyGroupwiseGemmRunner, mType, mDims, mGemmId);
 }
 
@@ -316,7 +316,7 @@ bool WeightOnlyGroupwiseQuantMatmulPlugin::supportsFormatCombination(
 
 void WeightOnlyGroupwiseQuantMatmulPlugin::configurePlugin(nvinfer1::DynamicPluginTensorDesc const* in, int nbInputs,
     nvinfer1::DynamicPluginTensorDesc const* out, int nbOutputs) noexcept
-{
+{//@#quant invoked before running the plugin
     auto const minM = std::accumulate(in[0].min.d, in[0].min.d + in[0].min.nbDims - 1, 1, std::multiplies<int>());
     auto const maxM = std::accumulate(in[0].max.d, in[0].max.d + in[0].max.nbDims - 1, 1, std::multiplies<int>());
 
@@ -341,7 +341,7 @@ void WeightOnlyGroupwiseQuantMatmulPlugin::configurePlugin(nvinfer1::DynamicPlug
 
 size_t WeightOnlyGroupwiseQuantMatmulPlugin::getWorkspaceSize(nvinfer1::PluginTensorDesc const* inputs, int nbInputs,
     nvinfer1::PluginTensorDesc const* outputs, int nbOutputs) const noexcept
-{
+{//@#quant invoked before running the plugin, after configurePlugin()
     return m_workspaceMaxSize;
 }
 
@@ -500,7 +500,7 @@ int WeightOnlyGroupwiseQuantMatmulPlugin::getNbOutputs() const noexcept
 }
 
 int WeightOnlyGroupwiseQuantMatmulPlugin::initialize() noexcept
-{
+{//@#quant invoked before running the plugin, after getWorkspaceSize()
     configGemm();
     return 0;
 }
@@ -574,7 +574,7 @@ IPluginV2* WeightOnlyGroupwiseQuantMatmulPluginCreator::createPlugin(
     {
         char const* attrName = fields[i].name;
         if (!strcmp(attrName, "quant_algo"))
-        {
+        {//@#quant tests/quantization/test_weight_only_groupwise_quant_matmul.py中把quant_algo每个二进制位都设置为特定含义
             TLLM_CHECK(fields[i].type == PluginFieldType::kINT32);
             QuantAlgo = static_cast<int>(*(static_cast<int const*>(fields[i].data)));
         }
@@ -583,7 +583,7 @@ IPluginV2* WeightOnlyGroupwiseQuantMatmulPluginCreator::createPlugin(
             TLLM_CHECK(fields[i].type == PluginFieldType::kINT32);
             GroupSize = static_cast<int>(*(static_cast<int const*>(fields[i].data)));
         }
-        else if (!strcmp(attrName, "type_id"))
+        else if (!strcmp(attrName, "type_id")) //@#quant 一般是输入输出的dtype id
         {
             TLLM_CHECK(fields[i].type == PluginFieldType::kINT32);
             type = static_cast<nvinfer1::DataType>(*(static_cast<nvinfer1::DataType const*>(fields[i].data)));
@@ -605,7 +605,7 @@ IPluginV2* WeightOnlyGroupwiseQuantMatmulPluginCreator::createPlugin(
     return nullptr;
 }
 
-IPluginV2* WeightOnlyGroupwiseQuantMatmulPluginCreator::deserializePlugin(
+IPluginV2* WeightOnlyGroupwiseQuantMatmulPluginCreator::deserializePlugin(//@# 当plugin被create后会先做一轮profiler，然后plugin连同profile结果做serialize，然后再deserializePlugin去运行。。。。好麻烦
     char const* name, void const* serialData, size_t serialLength) noexcept
 {
     // This object will be deleted when the network is destroyed, which will

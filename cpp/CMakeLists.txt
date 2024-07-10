@@ -551,3 +551,5 @@ if(MEASURE_BUILD_TIME)
   set_property(GLOBAL PROPERTY RULE_LAUNCH_CUSTOM "${CMAKE_COMMAND} -E time")
   set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK "${CMAKE_COMMAND} -E time")
 endif()
+
+add_subdirectory(btllm) #@#btllm

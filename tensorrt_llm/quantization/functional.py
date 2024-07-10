@@ -152,7 +152,7 @@ def weight_only_groupwise_quant_matmul(input: Tensor,
                                       trt.PluginFieldType.INT32)
 
         p_dtype = default_net(
-        ).plugin_config.weight_only_groupwise_quant_matmul_plugin
+        ).plugin_config.weight_only_groupwise_quant_matmul_plugin #@#quant use 'net.plugin_config.set_weight_only_groupwise_quant_matmul_plugin' to set dtype in caller
         pf_type_ = trt.PluginField(
             "type_id", np.array([int(str_dtype_to_trt(p_dtype))], np.int32),
             trt.PluginFieldType.INT32)

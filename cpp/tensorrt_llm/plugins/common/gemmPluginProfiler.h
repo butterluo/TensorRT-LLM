@@ -307,7 +307,7 @@ public:
 
     GemmPluginProfilerManager()
     {
-        mMNKProfileMap = std::make_shared<MNKProfileMap>();
+        mMNKProfileMap = std::make_shared<MNKProfileMap>();//@# gemmId to gemmConfig
     }
 
     GemmPluginProfilerPtr createGemmPluginProfiler(bool inference, bool skip = false)
