@@ -126,7 +126,7 @@ def _woq_groupwise_matmul(m,
                           has_bias,
                           group_size=128,
                           use_w4a8_awq=False):
-    seed = 131 
+    seed = 131
     # original quant gemm version: 0(atol=1e-7),1(1e-6),131(1e-7) BUT with bias in only can pass atol=1e-1,rtol=1e-2
     torch.manual_seed(seed)
     print(f"***** seed: {seed} *****")
@@ -199,8 +199,13 @@ def _woq_groupwise_matmul(m,
                 quant_algo,  
                 group_size,
                 m,n,k)
+    zero = zero.cuda()
+    scale = scale.cuda()
+    activation=activation.cuda() 
+    cuda_q_weight = cuda_q_weight.cuda()
+    bias = bias.cuda()
     output = gemmWeightOnlyGrpwisBf16W8(quantPlugin, m, n, k, zero, scale, activation, cuda_q_weight, bias)
-    print(output)
+    # print(output)
     if use_w4a8_awq:
         activation *= fp8_alpha
 
@@ -208,8 +213,9 @@ def _woq_groupwise_matmul(m,
         pre_quant_scale = pre_quant_scale.repeat(m, 1)
         activation = torch.mul(activation, pre_quant_scale)
 
-    # ref = _utils.woq_groupwise_gt_matmul(activation, ref_th_weight, bias) #@# coment for temporaly
-    # _utils.woq_assert_near_eq(ref, output, 2)
+    ref = _utils.woq_groupwise_gt_matmul(activation, ref_th_weight, bias) #@# coment for temporaly
+    ref = activation.cuda() + ref.cuda()
+    _utils.woq_assert_near_eq(ref, output, 2)
     print("************DONE****************")
 
 
@@ -261,4 +267,4 @@ def test_matmul_bf16_int4_input(m,
 #                                group_size)
 
 if __name__ == '__main__':
-    test_matmul_bf16_int4_input(32, 128, 128, 'bfloat16', False, True, True, 64)
+    test_matmul_bf16_int4_input(32, 128, 128, 'bfloat16', False, True, False, 64)

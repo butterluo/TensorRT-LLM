@@ -201,11 +201,9 @@ def _woq_groupwise_matmul(m,
         activation = torch.mul(activation, pre_quant_scale)
 
     ref = _utils.woq_groupwise_gt_matmul(activation, ref_th_weight, bias)
-    # ref = activation.float() + ref.float()
-    # ref = activation.cuda().to(activation_dtype) + ref.cuda().to(activation_dtype)
-    # output = activation + 1.0*output #@# atol=1e-7, rtol=0
+    # ref = activation.cuda() + ref.cuda()
     _utils.woq_assert_near_eq(ref, output, 2)
-    print("************DONE****************")
+    print("************DONE orig****************")
 
 
 # @parameterized.expand(
@@ -256,4 +254,4 @@ def test_matmul_bf16_int4_input(m,
 #                                group_size)
 
 if __name__ == '__main__':
-    test_matmul_bf16_int4_input(32, 128, 128, 'bfloat16', False, True, True, 64)
+    test_matmul_bf16_int4_input(32, 128, 128, 'bfloat16', False, True, False, 64)

@@ -17,6 +17,8 @@ include_directories(${PROJECT_SOURCE_DIR}
 
 find_package(Threads REQUIRED)
 
+add_subdirectory(kernels)
+
 # set(BTLLM_LINK_LIBS
 #     ${CUBLAS_LIB}
 #     ${CUBLASLT_LIB}
@@ -40,6 +42,8 @@ set(BTLLM_LINK_LIBS
     kernels_src
     fpA_intB_gemm_src
     cutlass_src
+
+    btfpA_intB_gemm_src
   )
 
 set(UNDEFINED_FLAG "-Wl,--no-undefined")

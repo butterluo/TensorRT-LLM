@@ -17,10 +17,10 @@
 #pragma once
 
 #include "tensorrt_llm/common/quantization.h"
-#include "tensorrt_llm/kernels/cutlass_kernels/fpA_intB_gemm/fpA_intB_gemm.h"
+#include "btllm/kernels/cutlass_kernels/btfpA_intB_gemm/btfpA_intB_gemm.h" //@#
 #include "tensorrt_llm/kernels/preQuantScaleKernel.h"
 #include "tensorrt_llm/kernels/weightOnlyBatchedGemv//kernelLauncher.h"
-#include "tensorrt_llm/plugins/common/gemmPluginProfiler.h"
+#include "btllm/plugins/common/gemmPluginProfiler.h"
 #include "tensorrt_llm/plugins/common/plugin.h"
 #include "tensorrt_llm/plugins/weightOnlyQuantMatmulPlugin/weightOnlyQuantMatmulPlugin.h"
 
@@ -40,12 +40,12 @@
 namespace btllm::plugins
 {
 
-using WeightOnlyGemmRunner = tensorrt_llm::kernels::cutlass_kernels::CutlassFpAIntBGemmRunnerInterface;
+using WeightOnlyGemmRunner = btllm::kernels::cutlass_kernels::BTCutlassFpAIntBGemmRunnerInterface;
 using WeightOnlyGemmRunnerPtr = std::shared_ptr<WeightOnlyGemmRunner>;
 
 class BTWeightOnlyGroupwiseQuantGemmPluginProfiler
-    : public tensorrt_llm::plugins::GemmPluginProfiler<tensorrt_llm::cutlass_extensions::CutlassGemmConfig, WeightOnlyGemmRunnerPtr,
-          tensorrt_llm::plugins::GemmIdCore, tensorrt_llm::plugins::GemmIdCoreHash>
+    : public btllm::plugins::GemmPluginProfiler<tensorrt_llm::cutlass_extensions::CutlassGemmConfig, WeightOnlyGemmRunnerPtr,
+          btllm::plugins::GemmIdCore, btllm::plugins::GemmIdCoreHash>
 {
 public:
     using Config = tensorrt_llm::cutlass_extensions::CutlassGemmConfig;
@@ -153,8 +153,8 @@ private:
     int mBiasesInputIdx;
     int mAlphaInputIdx;
 
-    tensorrt_llm::plugins::GemmDims mDims{};
-    tensorrt_llm::plugins::GemmIdCore mGemmId{};
+    btllm::plugins::GemmDims mDims{};
+    btllm::plugins::GemmIdCore mGemmId{};
 
     PluginProfilerPtr mPluginProfiler;
 };
@@ -178,9 +178,9 @@ public:
     //     char const* name, void const* serialData, size_t serialLength) noexcept override;
 
 private:
-    tensorrt_llm::plugins::GemmPluginProfilerManager<BTWeightOnlyGroupwiseQuantGemmPluginProfiler> gemmPluginProfileManager;
+    btllm::plugins::GemmPluginProfilerManager<BTWeightOnlyGroupwiseQuantGemmPluginProfiler> gemmPluginProfileManager;
     // static nvinfer1::PluginFieldCollection mFC;
     // static std::vector<nvinfer1::PluginField> mPluginAttributes;
 };
 
-} // namespace tensorrt_llm::plugins
+} // namespace btllm::plugins

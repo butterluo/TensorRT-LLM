@@ -24,6 +24,7 @@
 #include <torch/extension.h>
 #include <vector>
 
+#include <tensorrt_llm/common/cudaUtils.h>
 #include <btllm/plugins/weightOnlyGroupwiseQuantMatmulPlugin/btweightOnlyGroupwiseQuantMatmulPlugin.h>
 
 namespace py = pybind11;
@@ -33,6 +34,8 @@ using OptVec = std::optional<std::vector<T>>;
 
 using btllm::plugins::BTWeightOnlyGroupwiseQuantMatmulPlugin;
 using btllm::plugins::BTWeightOnlyGroupwiseQuantMatmulPluginCreator;
+
+using tensorrt_llm::common::check;
 
 #if not defined(BTLLM_PYBIND_MODULE)
 #error "BTLLM_PYBIND_MODULE must be defined"
@@ -77,9 +80,9 @@ torch::Tensor gemmWeightOnlyGrpwisBf16W8(std::shared_ptr<BTWeightOnlyGroupwiseQu
           // , void const* act_ptr, void const* weight_ptr, void const* biases_ptr
           // , void* output_ptr
         ) {
-  uint8_t* ptr = 0;
+  uint8_t* workspace = 0;
   size_t wrkSz = int8plugin->getWorkspaceSize();
-  cudaError_t cuda_error = cudaMalloc((void**)&ptr, wrkSz);
+  cudaError_t cuda_error = cudaMalloc((void**)&workspace, wrkSz);
   if (cuda_error != cudaSuccess) {
     TLLM_THROW("Failed to allocate memory with CUDA_ERR %s \n", cudaGetErrorString(cuda_error));
   }
@@ -107,9 +110,25 @@ torch::Tensor gemmWeightOnlyGrpwisBf16W8(std::shared_ptr<BTWeightOnlyGroupwiseQu
                      .dtype(act_tsr.scalar_type())
                      .layout(torch::kStrided)
                      .device(torch::kCUDA, act_tsr.device().index());//.requires_grad(true);
-  // torch::Tensor output = torch::empty({m, real_n}, options).contiguous();
-  torch::Tensor output = torch::ones({m, real_n}, options).contiguous();
-  // void *out_ptr = output.data_ptr();
+  torch::Tensor output = torch::empty({m, real_n}, options).contiguous();
+  // torch::Tensor output = torch::ones({m, real_n}, options).contiguous();
+  void *out_ptr = output.data_ptr();
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  // bool isCreatedStrm = true;
+  // cudaStream_t str2 = at::cuda::getCurrentCUDAStream();
+  // if (str2 == nullptr) {
+    // printf("********* Torch stream == nullptr *********");
+    // check_cuda_error(cudaStreamCreate(&stream));
+  // } else {
+  //   stream = at::cuda::getCurrentCUDAStream();
+  //   isCreatedStrm = false;
+  // }
+  int8plugin->enqueue(m, real_n, k, zeros_ptr, weight_scales_ptr, act_ptr, weight_ptr, biases_ptr, out_ptr, (void*)workspace, stream);
+  // if(isCreatedStrm) {
+    // check_cuda_error(cudaStreamDestroy(stream));
+  // }
+  cudaDeviceSynchronize();
+  check_cuda_error(cudaGetLastError());
   return output;
 }
 

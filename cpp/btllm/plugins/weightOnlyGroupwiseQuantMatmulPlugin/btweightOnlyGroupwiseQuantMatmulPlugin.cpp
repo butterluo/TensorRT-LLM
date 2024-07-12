@@ -157,14 +157,14 @@ void BTWeightOnlyGroupwiseQuantMatmulPlugin::init(nvinfer1::DataType type, int q
 //             {
 //                 // has zeros
 //                 m_weightOnlyGroupwiseGemmRunner = std::make_shared<
-//                     tensorrt_llm::kernels::cutlass_kernels::CutlassFpAIntBGemmRunner<__nv_fp8_e4m3, cutlass::uint4b_t,
+//                     tensorrt_llm::kernels::cutlass_kernels::BTCutlassFpAIntBGemmRunner<__nv_fp8_e4m3, cutlass::uint4b_t,
 //                         cutlass::WeightOnlyQuantOp::FINEGRAINED_SCALE_AND_ZEROS, half, half, half>>();
 //             }
 //             else
 //             {
 //                 // no zeros
 //                 m_weightOnlyGroupwiseGemmRunner
-//                     = std::make_shared<tensorrt_llm::kernels::cutlass_kernels::CutlassFpAIntBGemmRunner<__nv_fp8_e4m3,
+//                     = std::make_shared<tensorrt_llm::kernels::cutlass_kernels::BTCutlassFpAIntBGemmRunner<__nv_fp8_e4m3,
 //                         cutlass::uint4b_t, cutlass::WeightOnlyQuantOp::FINEGRAINED_SCALE_ONLY, half, half, half>>();
 //             }
 // #else
@@ -177,14 +177,14 @@ void BTWeightOnlyGroupwiseQuantMatmulPlugin::init(nvinfer1::DataType type, int q
 //             {
 //                 // has zeros
 //                 m_weightOnlyGroupwiseGemmRunner
-//                     = std::make_shared<tensorrt_llm::kernels::cutlass_kernels::CutlassFpAIntBGemmRunner<half,
+//                     = std::make_shared<tensorrt_llm::kernels::cutlass_kernels::BTCutlassFpAIntBGemmRunner<half,
 //                         cutlass::uint4b_t, cutlass::WeightOnlyQuantOp::FINEGRAINED_SCALE_AND_ZEROS>>();
 //             }
 //             else
 //             {
 //                 // no zeros
 //                 m_weightOnlyGroupwiseGemmRunner
-//                     = std::make_shared<tensorrt_llm::kernels::cutlass_kernels::CutlassFpAIntBGemmRunner<half,
+//                     = std::make_shared<tensorrt_llm::kernels::cutlass_kernels::BTCutlassFpAIntBGemmRunner<half,
 //                         cutlass::uint4b_t, cutlass::WeightOnlyQuantOp::FINEGRAINED_SCALE_ONLY>>();
 //             }
 //         }
@@ -212,14 +212,14 @@ void BTWeightOnlyGroupwiseQuantMatmulPlugin::init(nvinfer1::DataType type, int q
                 assert(!(quant_algo & FP8_ALPHA));  //@#TODO NOT support fp8
                 // has zeros @#quant
                 m_weightOnlyGroupwiseGemmRunner
-                    = std::make_shared<tensorrt_llm::kernels::cutlass_kernels::CutlassFpAIntBGemmRunner<__nv_bfloat16,
+                    = std::make_shared<btllm::kernels::cutlass_kernels::BTCutlassFpAIntBGemmRunner<__nv_bfloat16,
                         cutlass::uint4b_t, cutlass::WeightOnlyQuantOp::FINEGRAINED_SCALE_AND_ZEROS>>();
         //     }
         //     else
         //     {
         //         // no zeros
         //         m_weightOnlyGroupwiseGemmRunner
-        //             = std::make_shared<tensorrt_llm::kernels::cutlass_kernels::CutlassFpAIntBGemmRunner<__nv_bfloat16,
+        //             = std::make_shared<tensorrt_llm::kernels::cutlass_kernels::BTCutlassFpAIntBGemmRunner<__nv_bfloat16,
         //                 cutlass::uint4b_t, cutlass::WeightOnlyQuantOp::FINEGRAINED_SCALE_ONLY>>();
         //     }
         // }
@@ -235,7 +235,7 @@ void BTWeightOnlyGroupwiseQuantMatmulPlugin::init(nvinfer1::DataType type, int q
     mPluginProfiler->setQuantAlgo(mQuantAlgo);
     mPluginProfiler->setGroupSize(mGroupSize);
 
-    mGemmId = tensorrt_llm::plugins::GemmIdCore(mDims.n, mDims.k, mType);//mDims is not init here, so does mGemmId
+    mGemmId = btllm::plugins::GemmIdCore(mDims.n, mDims.k, mType);//mDims is not init here, so does mGemmId
 }
 
 // IPluginV2DynamicExt Methods

@@ -57,6 +57,9 @@ endforeach(PLUGIN_ITER)
 
 include_directories(${TRTLLMDIR_SRC}/plugins/common)
 # add_subdirectory(${TRTLLMDIR_SRC}/plugins/common tensorrt_llm/plugins/common) #@# 添加非子目录参考：https://stackoverflow.com/questions/35260552/how-do-i-explicitly-specify-an-out-of-tree-source-in-cmake
+include_directories(common)
+add_subdirectory(common)
+
 
 # Set gencodes
 list(APPEND PLUGIN_SOURCES "${PLUGIN_CU_SOURCES}")
