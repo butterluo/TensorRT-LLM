@@ -361,7 +361,7 @@ class Attention(Module):
                     'rope_scaling_long_factors',
                     Parameter(rope_scaling_long_factors, dtype='float32'))
             else:
-                # Rotary cos/sin cache.
+                # Rotary cos/sin cache. @#lma
                 embed_positions = RopeEmbeddingUtils.create_sinusoidal_positions(
                     self.max_position_embeddings,
                     self.rotary_embedding_dim,
@@ -493,8 +493,7 @@ class Attention(Module):
             else:
                 assert qkv.ndim() == 2
 
-        if default_net(
-        ).plugin_config.lora_plugin and qkv_lora_params is None and lora_layer_params is not None:
+        if default_net().plugin_config.lora_plugin and qkv_lora_params is None and lora_layer_params is not None:
             if not self.cross_attention:
                 q_lora_params = lora_layer_params.get_runtime_params(
                     0, "attn_q")
@@ -583,8 +582,7 @@ class Attention(Module):
         assert kv_cache_params is None or kv_cache_params.is_valid(
             default_net().plugin_config.gpt_attention_plugin)
 
-        past_key_value = None if kv_cache_params is None else kv_cache_params.get_first_past_key_value(
-        )
+        past_key_value = None if kv_cache_params is None else kv_cache_params.get_first_past_key_value()
 
         # if cross attention, cross QKV only needs to be calculated once in the
         # 1st decoding step --> write to cross KV cache --> remains constant
@@ -633,7 +631,7 @@ class Attention(Module):
             ], 'Plugin only support masked MHA.'
 
             # KV cache scales.
-            if self.kv_cache_scaling_factor is not None:
+            if self.kv_cache_scaling_factor is not None:#@#???
                 kv_orig_quant_scale = constant(fp32_array(
                     [1.0])) / self.kv_cache_scaling_factor.value
                 kv_quant_orig_scale = self.kv_cache_scaling_factor.value
@@ -685,8 +683,7 @@ class Attention(Module):
                 rope_scaling_factors = rope_scaling_factors.view((-1, ))
             else:
                 # Rotary cos/sin cache.
-                rotary_cos_sin = self.embed_positions_for_gpt_attention.value if self.position_embedding_type.is_rope(
-                ) else None
+                rotary_cos_sin = self.embed_positions_for_gpt_attention.value if self.position_embedding_type.is_rope() else None
                 rope_scaling_factors = None
             mscale = self.mscale if self.position_embedding_type == PositionEmbeddingType.long_rope else None
             context, past_key_value = gpt_attention(#@#lma qwn
