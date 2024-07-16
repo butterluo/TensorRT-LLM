@@ -1,19 +1,3 @@
-/*
- * SPDX-FileCopyrightText: Copyright (c) 1993-2022 NVIDIA CORPORATION &
- * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 
 #include <cstdio>
 
@@ -32,10 +16,11 @@ using btllm::plugins::LookupPlugin;
 // PluginFieldCollection LookupPluginCreator::mFC{};
 // std::vector<nvinfer1::PluginField> LookupPluginCreator::mPluginAttributes;
 
-LookupPlugin::LookupPlugin(nvinfer1::DataType type, int rank)
-    : mType(type)
-    , mRank(rank)
-{
+LookupPlugin::LookupPlugin(const int localVocabSize, const int hidden, nvinfer1::DataType dataType)
+    : localVocabSize(localVocabSize)
+    , hidden(hidden)
+    , mType(dataType) 
+    , dataTypeBitSz(trtDataTypeToBitSz(mType)) {
 }
 
 // // Parameterized constructor
@@ -116,7 +101,7 @@ LookupPlugin::LookupPlugin(nvinfer1::DataType type, int rank)
 
 // int LookupPlugin::enqueue(nvinfer1::PluginTensorDesc const* inputDesc, nvinfer1::PluginTensorDesc const* outputDesc,
 //     void const* const* inputs, void* const* outputs, void* workspace, cudaStream_t stream) noexcept
-int LookupPlugin::enqueue(int const localVocabSize, int const hidden, int const* input_ids, int64_t tokenNum, void* const weight, void* const outputs, cudaStream_t stream) noexcept
+int LookupPlugin::enqueue(BTParam param, cudaStream_t stream) noexcept
 {
     // inputs
     //     input  [tokenNum]
@@ -134,7 +119,7 @@ int LookupPlugin::enqueue(int const localVocabSize, int const hidden, int const*
     // int const hidden = inputDesc[1].dims.d[inputDesc[1].dims.nbDims - 1];
     // int const* input = reinterpret_cast<int const*>(inputs[0]);
 
-    int offset = mRank * localVocabSize;
+    int offset = rank * localVocabSize;
 
     // if (mType == DataType::kHALF)
     // {
@@ -149,13 +134,13 @@ int LookupPlugin::enqueue(int const localVocabSize, int const hidden, int const*
     //     invokeLookUp<float, int>(output, input, weight, tokenNum, offset, localVocabSize, hidden, stream);
     // }
     // else 
-    if (mType == DataType::kBF16) //@#TODO support BF16 only temporarily
+    if (mType == nvinfer1::DataType::kBF16) //@#TODO support BF16 only temporarily
     {
         // __nv_bfloat16 const* weight = reinterpret_cast<__nv_bfloat16 const*>(inputs[1]);
         // __nv_bfloat16* output = reinterpret_cast<__nv_bfloat16*>(outputs[0]);
-        __nv_bfloat16 const* weight_ptr = reinterpret_cast<__nv_bfloat16 const*>(weight);
-        __nv_bfloat16* output_ptr = reinterpret_cast<__nv_bfloat16*>(outputs);
-        invokeLookUp<__nv_bfloat16, int>(output_ptr, input_ids, weight_ptr, tokenNum, offset, localVocabSize, hidden, stream);
+        __nv_bfloat16 const* weight_ptr = reinterpret_cast<__nv_bfloat16 const*>(param.weight);
+        __nv_bfloat16* output_ptr = reinterpret_cast<__nv_bfloat16*>(param.outputs);
+        invokeLookUp<__nv_bfloat16, int>(output_ptr, param.input_ids, weight_ptr, param.tokenNum, offset, localVocabSize, hidden, stream);
     } else {
       TLLM_THROW("Unsupported data type");
     }

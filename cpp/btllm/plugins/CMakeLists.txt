@@ -41,7 +41,7 @@ set(PLUGIN_LISTS
     # rmsnormQuantizationPlugin
     weightOnlyGroupwiseQuantMatmulPlugin
     # weightOnlyQuantMatmulPlugin
-    # lookupPlugin
+    lookupPlugin
     # loraPlugin
     # mixtureOfExperts
     # selectiveScanPlugin

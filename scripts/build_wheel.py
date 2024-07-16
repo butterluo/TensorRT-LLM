@@ -167,7 +167,7 @@ def main(build_type: str = "Release",
             f'cmake --build . --config {build_type} --parallel {job_count} '
             # f'--target tensorrt_llm nvinfer_plugin_tensorrt_llm {th_common_lib} {bindings_lib} {benchmarks_lib} {executor_worker}'
             #@#MODIFY change above to below, to build btllm
-            f'--target tensorrt_llm nvinfer_plugin_tensorrt_llm {th_common_lib} {bindings_lib} {benchmarks_lib} {executor_worker} btllm btpybind btllm_plugin'
+            f'--target tensorrt_llm nvinfer_plugin_tensorrt_llm {th_common_lib} {bindings_lib} {benchmarks_lib} {executor_worker} btllm btllm_plugin btllm_mdl btpybind'
             f'{" ".join(extra_make_targets)}')
 
     if cpp_only:

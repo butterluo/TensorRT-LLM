@@ -22,15 +22,25 @@
 #include <string>
 #include <vector>
 
+#include "btllm/btcommon/bt.h"
+
 namespace btllm::plugins
 {
 
 class LookupPlugin //: public BasePlugin
 {
 public:
-    LookupPlugin() = delete;
 
-    LookupPlugin(nvinfer1::DataType type, int rank);
+struct BTParam: BTBaseParam {//for run
+  void* weight = nullptr;
+  int* input_ids = nullptr; 
+  int64_t tokenNum = 0;
+  void* outputs = nullptr;
+};
+public:
+    LookupPlugin() = delete;
+    LookupPlugin(const int localVocabSize, const int hidden, nvinfer1::DataType dataType);
+    // LookupPlugin(nvinfer1::DataType type, int rank);
 
     ~LookupPlugin() = default;
 
@@ -44,12 +54,12 @@ public:
     //     nvinfer1::DynamicPluginTensorDesc const* out, int nbOutputs) noexcept override;
     // size_t getWorkspaceSize(nvinfer1::PluginTensorDesc const* inputs, int nbInputs,
     //     nvinfer1::PluginTensorDesc const* outputs, int nbOutputs) const noexcept override;
-    int enqueue(int const localVocabSize, int const hidden, int const* input_ids, int64_t tokenNum, void* const weight, void* const outputs, cudaStream_t stream) noexcept;
+    int enqueue(BTParam param, cudaStream_t stream) noexcept;
 
     // // IPluginV2Ext Methods
     // nvinfer1::DataType getOutputDataType(
     //     int index, nvinfer1::DataType const* inputTypes, int nbInputs) const noexcept override;
-
+    //
     // // IPluginV2 Methods
     // char const* getPluginType() const noexcept override;
     // char const* getPluginVersion() const noexcept override;
@@ -60,11 +70,16 @@ public:
     // void serialize(void* buffer) const noexcept override;
     // void destroy() noexcept override;
 
+  const int localVocabSize;
+  const int hidden;
+  const nvinfer1::DataType mType;
+  const int dataTypeBitSz;
+  
+  int rank = 0;
+
 private:
     // const std::string mLayerName;
 
-    nvinfer1::DataType mType;
-    int mRank;
 };
 
 // class LookupPluginCreator //: public BaseCreator
@@ -88,37 +103,37 @@ private:
 //     static std::vector<nvinfer1::PluginField> mPluginAttributes;
 // };
 
-LookupPlugin* createLookupPlugin(char const* name, nvinfer1::DataType type) noexcept
-{
-    // PluginField const* fields = fc->fields;
-    // nvinfer1::DataType type;
-    // int rank;
-    // // Read configurations from each fields
-    // for (int i = 0; i < fc->nbFields; ++i)
-    // {
-    //     char const* attrName = fields[i].name;
-    //     if (!strcmp(attrName, "type_id"))
-    //     {
-    //         TLLM_CHECK(fields[i].type == PluginFieldType::kINT32);
-    //         type = static_cast<nvinfer1::DataType>(*(static_cast<nvinfer1::DataType const*>(fields[i].data)));
-    //     }
-    //     else if (!strcmp(attrName, "rank"))
-    //     {
-    //         TLLM_CHECK(fields[i].type == PluginFieldType::kINT32);
-    //         rank = static_cast<int>(*(static_cast<int const*>(fields[i].data)));
-    //     }
-    // }
-    try
-    {
-        auto* obj = new LookupPlugin(type, 0);
-        return obj;
-    }
-    catch (std::exception const& e)
-    {
-        caughtError(e);
-    }
-    return nullptr;
-}
+// LookupPlugin* createLookupPlugin(char const* name, nvinfer1::DataType type) noexcept
+// {
+//     // PluginField const* fields = fc->fields;
+//     // nvinfer1::DataType type;
+//     // int rank;
+//     // // Read configurations from each fields
+//     // for (int i = 0; i < fc->nbFields; ++i)
+//     // {
+//     //     char const* attrName = fields[i].name;
+//     //     if (!strcmp(attrName, "type_id"))
+//     //     {
+//     //         TLLM_CHECK(fields[i].type == PluginFieldType::kINT32);
+//     //         type = static_cast<nvinfer1::DataType>(*(static_cast<nvinfer1::DataType const*>(fields[i].data)));
+//     //     }
+//     //     else if (!strcmp(attrName, "rank"))
+//     //     {
+//     //         TLLM_CHECK(fields[i].type == PluginFieldType::kINT32);
+//     //         rank = static_cast<int>(*(static_cast<int const*>(fields[i].data)));
+//     //     }
+//     // }
+//     try
+//     {
+//         auto* obj = new LookupPlugin(type, 0);
+//         return obj;
+//     }
+//     catch (std::exception const& e)
+//     {
+//         caughtError(e);
+//     }
+//     return nullptr;
+// }
 
 
 } // namespace tensorrt_llm::plugins

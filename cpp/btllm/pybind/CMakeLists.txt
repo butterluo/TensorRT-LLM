@@ -18,8 +18,9 @@ endif()
 find_package(pybind11 REQUIRED)
 
 set(SRCS
-    bindings.cpp
-  )
+    # bindings.cpp
+    llamabind.cpp
+)
 
 pybind11_add_module(${BTLLM_PYBIND_MODULE} ${SRCS})
 
@@ -30,7 +31,7 @@ target_link_directories(${BTLLM_PYBIND_MODULE} PUBLIC
                         "${TORCH_INSTALL_PREFIX}/lib")
 target_link_libraries(
   ${BTLLM_PYBIND_MODULE}
-  PUBLIC ${BTSHARED_TARGET} ${Python3_LIBRARIES} ${TORCH_LIBRARIES} torch_python btllm_plugin
+  PUBLIC ${BTSHARED_TARGET} ${Python3_LIBRARIES} ${TORCH_LIBRARIES} torch_python btllm_plugin btllm_mdl
          ${UNDEFINED_FLAG})
 target_compile_definitions(${BTLLM_PYBIND_MODULE}
                            PUBLIC BTLLM_PYBIND_MODULE=${BTLLM_PYBIND_MODULE})

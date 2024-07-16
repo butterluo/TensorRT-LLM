@@ -17,7 +17,9 @@ include_directories(${PROJECT_SOURCE_DIR}
 
 find_package(Threads REQUIRED)
 
+add_subdirectory(btcommon)
 add_subdirectory(kernels)
+
 
 # set(BTLLM_LINK_LIBS
 #     ${CUBLAS_LIB}
@@ -42,8 +44,9 @@ set(BTLLM_LINK_LIBS
     kernels_src
     fpA_intB_gemm_src
     cutlass_src
-
+    btcommon_src
     btfpA_intB_gemm_src
+    # btmdl_src
   )
 
 set(UNDEFINED_FLAG "-Wl,--no-undefined")
@@ -80,4 +83,5 @@ set_target_properties(${BTSHARED_TARGET} PROPERTIES LINK_FLAGS
 # endif() 
 
 add_subdirectory(plugins)
+add_subdirectory(mdl)
 add_subdirectory(pybind)
