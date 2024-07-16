@@ -31,16 +31,22 @@ std::shared_ptr<LlamaA16W4> createLlama(int mxBtchTkn,
   return std::shared_ptr<LlamaA16W4>(obj);
 }
 
-torch::Tensor runLlama(std::shared_ptr<LlamaA16W4> lma, const torch::Tensor &inpIdTsr, int seqLen, int mxOutputLen) {
+torch::Tensor runLlama(std::shared_ptr<LlamaA16W4> lma, const torch::Tensor &inpIdTsr, int seqLen_, int mxOutputLen) {
   auto options = torch::TensorOptions()
                      .dtype(torch::kInt32)
                      .layout(torch::kStrided)
                      .device(inpIdTsr.device());
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  int batchSz = inpIdTsr.size(0);
+  int seqLen = inpIdTsr.size(1);
+  int tokenNum = batchSz * seqLen;
+  int hidSz = inpIdTsr.size(2);
   lma->setStream(stream);
-  lma->initRunParam(seqLen, mxOutputLen);
+  lma->initRunParam(tokenNum, mxOutputLen);
   torch::Tensor output = torch::empty({mxOutputLen}, options).contiguous();
   lma->Forward(reinterpret_cast<int*>(inpIdTsr.data_ptr()), reinterpret_cast<int*>(output.data_ptr()));
+  torch::Tensor embOutTsr = torch::empty({batchSz, seqLen, hidSz}, options).contiguous();
+  lma->_buf
   return output;
 }
 

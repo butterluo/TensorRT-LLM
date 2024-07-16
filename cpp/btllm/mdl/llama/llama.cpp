@@ -26,11 +26,11 @@ void LlamaA16W4::setWAndGrd(void* weightPtr, void* grdPtr) {
   void* nxt_ptr = _emb_w_ptr + (mArg.vocabSz * mArg.hidSz);
 }
 
-void LlamaA16W4::initRunParam(int seqLen, int mxOutputLen, bool initAll) {
+void LlamaA16W4::initRunParam(int tokenNum, int mxOutputLen, bool initAll) {
   if(initAll) {
     _param.lookupParam.weight = _emb_w_ptr;
   }
-  _param.lookupParam.tokenNum = seqLen;
+  _param.lookupParam.tokenNum = tokenNum;
   _param.mxOutputLen = mxOutputLen;
 }
 

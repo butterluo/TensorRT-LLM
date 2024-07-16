@@ -45,9 +45,12 @@ void setWAndGrd(void* weights_ptr, void* grads_ptr);
 
 void initBuf();
 
-void initRunParam(int seqLen, int mxOutputLen, bool initAll=true);
+void initRunParam(int tokenNum, int mxOutputLen, bool initAll=true);
 
 void Forward(const int *input_ptr, int *out_ptr);
+
+
+char* _buf = nullptr;
 
 private:
 
@@ -55,7 +58,7 @@ private:
 BTParam _param;
 cudaStream_t _stream = NULL;
 LookupPlugin _lookupPlugin;
-char* _buf = nullptr;
+
 __nv_bfloat16* _emb_w_ptr = nullptr;
 };
 

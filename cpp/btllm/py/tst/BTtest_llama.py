@@ -239,7 +239,7 @@ def test_llama(use_refit, fast_building, context_fmha_flag,
     use_plugin = True  # gpt plugin
     batch_size = 4
     beam_width = 1
-    input_len = 4
+    input_len = 5 #4
     output_len = 2
     max_seq_len = input_len + output_len
     world_size = 1
@@ -315,6 +315,8 @@ def test_llama(use_refit, fast_building, context_fmha_flag,
             )
     print("-----------------------------")
     print(lma)
+
+    print(hf_outputs.hidden_states[0].shape)
     
 
 
