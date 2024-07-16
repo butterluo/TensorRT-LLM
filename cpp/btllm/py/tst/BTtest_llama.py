@@ -1,6 +1,16 @@
 import os
-import random
 import sys
+
+sys.path.append(os.path.dirname(__file__))
+
+from path_util import *
+sys.path.append(f"{PRJ_ROOT_PATH}/cpp/build_Debug")  #@# 以便加载pybind11生成的so包
+sys.path.append(f"{PRJ_ROOT_PATH}/tests/")
+sys.path.append(f"{PRJ_ROOT_PATH}/tests/quantization/")
+sys.path.append(f"{PRJ_ROOT_PATH}/tests/model/")
+
+
+import random
 import tempfile
 import unittest
 from itertools import product
@@ -21,10 +31,12 @@ from tensorrt_llm.models.modeling_utils import PretrainedConfig, optimize_model
 from tensorrt_llm.network import net_guard
 from tensorrt_llm.plugin.plugin import ContextFMHAType
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+# sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from utils.llm_data import llm_models_root
 from utils.util import (skip_bf16_pre_ampere, skip_fp32_accum_pre_ampere,
                         unittest_name_func)
+
+from btllm.pybind.btpybind import *
 
 
 # class TestLLaMA(unittest.TestCase):
@@ -291,10 +303,29 @@ def test_llama(use_refit, fast_building, context_fmha_flag,
     sequence_length_buffer = ctx_context_lengths.detach().clone()
 
     with torch.no_grad():
-        hf_outputs = hf_llama.forward(ctx_ids)
+        hf_outputs = hf_llama.forward(ctx_ids, output_hidden_states=True)
     torch.cuda.synchronize()
     ref = hf_outputs.logits[:, -1, :]
 
+    lma = createLlama(
+            batch_size * llama_config.max_position_embeddings,
+            llama_config.vocab_size,
+            llama_config.hidden_size,
+            hf_llama.model.embed_tokens.weight
+            )
+    print("-----------------------------")
+    print(lma)
+    
+
+
+
+
+
+
+
+
+
+"""
     if enable_remove_input_padding:
         ctx_ids = ctx_ids.view([batch_size * input_len])
         ctx_position_ids = ctx_position_ids.view([batch_size * input_len])
@@ -428,6 +459,9 @@ def test_llama(use_refit, fast_building, context_fmha_flag,
     np.testing.assert_allclose(ref.to(torch.float32).cpu().numpy(),
                                 res.to(torch.float32).cpu().numpy(),
                                 atol=0.12)
+"""
+
+###############################################################
 """
     def get_loader_test_cases():
         test_cases = []
