@@ -307,16 +307,30 @@ def test_llama(use_refit, fast_building, context_fmha_flag,
     torch.cuda.synchronize()
     ref = hf_outputs.logits[:, -1, :]
 
+    btref = hf_llama.model.embed_tokens(ctx_ids).clone().detach()
+    print("-----------------------------0")
+    print(btref)
+
     lma = createLlama(
             batch_size * llama_config.max_position_embeddings,
             llama_config.vocab_size,
             llama_config.hidden_size,
-            hf_llama.model.embed_tokens.weight
+            hf_llama.model.embed_tokens.weight.to(torch.bfloat16)
             )
-    print("-----------------------------")
+    print("-----------------------------1")
+    btref2 = hf_outputs.hidden_states[0]
+    print(btref2.shape)
     print(lma)
+    print(btref2)
 
-    print(hf_outputs.hidden_states[0].shape)
+    btres = runLlama(lma, ctx_ids, output_len)
+    print("-----------------------------2")
+    print(btres)
+    np.testing.assert_allclose(btref.to(torch.float32).cpu().numpy(),
+                                   btres.to(torch.float32).cpu().numpy(),
+                                   atol=0.12,verbose=True)
+
+    
     
 
 

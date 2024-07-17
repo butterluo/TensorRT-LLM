@@ -20,6 +20,8 @@ struct BTArg: BTBaseArg { //for init
 
 struct BTParam: BTBaseParam {//for run
   LookupPlugin::BTParam lookupParam;
+  int batchSz;
+  int seqLen;
   int mxOutputLen;
 };
 
@@ -45,7 +47,7 @@ void setWAndGrd(void* weights_ptr, void* grads_ptr);
 
 void initBuf();
 
-void initRunParam(int tokenNum, int mxOutputLen, bool initAll=true);
+void initRunParam(int batchSz, int seqLen, int mxOutputLen, bool initAll=true);
 
 void Forward(const int *input_ptr, int *out_ptr);
 
