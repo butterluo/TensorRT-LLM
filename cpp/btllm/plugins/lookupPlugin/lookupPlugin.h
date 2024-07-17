@@ -27,6 +27,10 @@
 namespace btllm::plugins
 {
 
+template <typename T, typename Idx>
+void invokeLookUp(T* out, Idx const* input, T const* weight, const int64_t token_num, const Idx offset, const Idx size,
+    Idx const n_embed, cudaStream_t stream = 0);
+
 class LookupPlugin //: public BasePlugin
 {
 public:
