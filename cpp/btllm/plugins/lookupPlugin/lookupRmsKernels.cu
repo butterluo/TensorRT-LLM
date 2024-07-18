@@ -15,13 +15,15 @@
  */
 
 #include "tensorrt_llm/common/cudaTypeUtils.cuh"
+#include "tensorrt_llm/common/reduceKernelUtils.cuh"
+#include "btllm/btcommon/bt.h"
 #include "lookupPlugin.h"
 
 using namespace tensorrt_llm::common;
 
-namespace tensorrt_llm
+namespace btllm
 {
-namespace kernels
+namespace plugins
 {
 /* When running with multiple GPUs, we split the embedding lookup table across multiple GPUs to save the memory
 requirements of embedding lookup table ([vocab_size, hidden]). This operation is equivalent to the single GPU version of
@@ -38,9 +40,9 @@ input IDs and get the correct results.
  *
  * If the input ids is out of range it writes zero, otherwise it writes the correct embedding result.
  */
-template <typename T, typename Idx>
-__global__ void lookup_kernel(T* output, Idx const* input, T const* weight, int64_t const token_num, Idx const offset,
-    Idx const size, Idx const n_embed, const int fold, T const* gamma)
+template <typename T, typename Idx, int tmpNum>
+__global__ void lookupRmsKernel(T* output, Idx const* input, T const* weight, int64_t const token_num, Idx const offset,
+    Idx const size, Idx const n_embed, T const* gamma)
 {
     __shared__ int word_index;
     __shared__ float rms;
@@ -53,7 +55,7 @@ __global__ void lookup_kernel(T* output, Idx const* input, T const* weight, int6
     }
     __syncthreads();
     int curIdx = 0;
-    T tmpArr[fold] = {0};
+    T tmpArr[tmpNum] = {0};
     float sqrSum = 0;
     if (word_index >= 0 && word_index < size) {
         const float rld = 1.f / float(n_embed);
@@ -72,41 +74,49 @@ __global__ void lookup_kernel(T* output, Idx const* input, T const* weight, int6
     ///////////////// RMS //////////////////
     float blkSum = blockReduceSum(sqrSum);
     if (threadIdx.x == 0) {
-      rms = rsqrtf(blkSum + eps);
+      rms = rsqrtf(blkSum + EPS);
     }
     __syncthreads();
     curIdx = 0;
-    for (int i = tidx; i < n_elems; i += blockDim.x) {
+    for (int i = threadIdx.x; i < n_elems; i += blockDim.x) {
       T tmpVal = tmpArr[curIdx];
       int const index = blockIdx.x * n_elems + i;
-      output[index] = tmpVal * rms * gamma[i];
+      output[index] = __bfloat162float(tmpVal) * rms * __bfloat162float(gamma[i]);
     }
 }
 
 template <typename T, typename Idx>
-void invokeLookUp(T* out, Idx const* input, T const* weight, int64_t const token_num, Idx const offset, Idx const size,
-    Idx const n_embed, cudaStream_t stream)
+void invokeLookUpRms(T* out, Idx const* input, T const* weight, int64_t const token_num, Idx const offset, Idx const size,
+    Idx const n_embed, T const* gamma, cudaStream_t stream)
 {
-    int64_t constexpr max_block_num = 65536;
-    Idx constexpr max_block_size = 512;
-    dim3 grid(min(token_num, max_block_num));
-    dim3 block(min(n_embed, max_block_size));
-    lookup_kernel<T, Idx><<<grid, block, 0, stream>>>(out, input, weight, token_num, offset, size, n_embed);
+    // int64_t constexpr max_block_num = 65536;
+    // Idx constexpr max_block_size = 512;
+    // dim3 grid(min(token_num, max_block_num));
+    // dim3 block(min(n_embed, max_block_size));
+    // lookup_kernel<T, Idx><<<grid, block, 0, stream>>>(out, input, weight, token_num, offset, size, n_embed);
 
     dim3 grid(token_num);
     dim3 block(min(n_embed, 1024));
-    int flod = n_embed > 1024 ? 1 : ((n_embed + 1023) /1024);
+    const int flod = n_embed > 1024 ? 1 : ((n_embed + 1023) /1024);
+    if(flod < 2) {
+      lookupRmsKernel<T, Idx, 1><<<grid, block, 0, stream>>>(out, input, weight, token_num, offset, size, n_embed, gamma);
+    } else if (flod < 5) {
+      lookupRmsKernel<T, Idx, 4><<<grid, block, 0, stream>>>(out, input, weight, token_num, offset, size, n_embed, gamma);
+    } else {
+      lookupRmsKernel<T, Idx, 8><<<grid, block, 0, stream>>>(out, input, weight, token_num, offset, size, n_embed, gamma);
+    }
+    
 }
 
-#define INSTANTIATE_LOOK_UP(T, Idx)                                                                                    \
-    template void invokeLookUp<T, Idx>(T * out, Idx const* input, T const* weight, int64_t const token_num,            \
-        Idx const offset, Idx const size, Idx const n_embed, cudaStream_t stream)
+#define INSTANTIATE_LOOK_UPRMS(T, Idx)                                                                                    \
+    template void invokeLookUpRms<T, Idx>(T * out, Idx const* input, T const* weight, int64_t const token_num,            \
+        Idx const offset, Idx const size, Idx const n_embed, T const* gamma, cudaStream_t stream)
 
-INSTANTIATE_LOOK_UP(float, int);
-INSTANTIATE_LOOK_UP(half, int);
+// INSTANTIATE_LOOK_UPRMS(float, int);
+// INSTANTIATE_LOOK_UPRMS(half, int);
 
 #ifdef ENABLE_BF16
-INSTANTIATE_LOOK_UP(__nv_bfloat16, int);
+INSTANTIATE_LOOK_UPRMS(__nv_bfloat16, int);
 #endif
 
 } // namespace kernels

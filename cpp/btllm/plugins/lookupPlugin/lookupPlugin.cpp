@@ -139,8 +139,9 @@ int LookupPlugin::enqueue(BTParam param, cudaStream_t stream) noexcept
         // __nv_bfloat16 const* weight = reinterpret_cast<__nv_bfloat16 const*>(inputs[1]);
         // __nv_bfloat16* output = reinterpret_cast<__nv_bfloat16*>(outputs[0]);
         __nv_bfloat16 const* weight_ptr = reinterpret_cast<__nv_bfloat16 const*>(param.weight);
+        __nv_bfloat16 const* gamma_ptr = reinterpret_cast<__nv_bfloat16 const*>(param.gamma);
         __nv_bfloat16* output_ptr = reinterpret_cast<__nv_bfloat16*>(param.outputs);
-        invokeLookUp<__nv_bfloat16, int>(output_ptr, param.input_ids, weight_ptr, param.tokenNum, offset, localVocabSize, hidden, stream);
+        invokeLookUpRms<__nv_bfloat16, int>(output_ptr, param.input_ids, weight_ptr, param.tokenNum, offset, localVocabSize, hidden, gamma_ptr, stream);
     } else {
       TLLM_THROW("Unsupported data type");
     }

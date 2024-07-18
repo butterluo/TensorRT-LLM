@@ -1,5 +1,7 @@
 #pragma once
 
+#include <nlohmann/json.hpp>
+
 #include "btllm/btcommon/bt.h"
 #include "btllm/plugins/lookupPlugin/lookupPlugin.h"
 
@@ -7,6 +9,7 @@ using btllm::plugins::LookupPlugin;
 
 namespace btllm {
 namespace mdl {
+
 
 class Llama {
 
@@ -25,21 +28,15 @@ struct BTParam: BTBaseParam {//for run
   int mxOutputLen;
 };
 
-virtual ~Llama() = default;
-
-};
-
-class LlamaA16W4 : public Llama{
-
 public:
 
 BTArg mArg;
 
-LlamaA16W4() = delete;
+Llama() = delete;
 
-LlamaA16W4(BTArg arg);
+Llama(const std::string& jsn);
 
-~LlamaA16W4() = default;
+~Llama() = default;
 
 void setStream(cudaStream_t stream);
 
@@ -56,12 +53,13 @@ char* _buf = nullptr;
 
 private:
 
-
+Json _jsn;
 BTParam _param;
 cudaStream_t _stream = NULL;
 LookupPlugin _lookupPlugin;
 
 __nv_bfloat16* _emb_w_ptr = nullptr;
+__nv_bfloat16* _prerms_w_ptr = nullptr;
 };
 
 }

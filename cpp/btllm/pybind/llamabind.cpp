@@ -7,6 +7,7 @@
 #include <torch/extension.h>
 #include <vector>
 
+
 #include "tensorrt_llm/common/cudaUtils.h"
 #include "btllm/mdl/llama/llama.h"
 
@@ -15,23 +16,32 @@ namespace py = pybind11;
 template <typename T>
 using OptVec = std::optional<std::vector<T>>;
 using btllm::mdl::Llama;
-using btllm::mdl::LlamaA16W4;
 
-std::shared_ptr<LlamaA16W4> createLlama(int mxBtchTkn,
-          int vocabSz,
-          int hidSz,
+
+
+// std::shared_ptr<Llama> createLlama(int mxBtchTkn,
+//           int vocabSz,
+//           int hidSz,
+//           const torch::Tensor &weights
+//   ) {
+//   Llama::BTArg lmaArg;
+//   lmaArg._max_batch_tokens = mxBtchTkn;
+//   lmaArg.vocabSz = vocabSz;
+//   lmaArg.hidSz = hidSz;
+//   Llama* obj = new Llama(lmaArg);
+//   obj->setWAndGrd(weights.data_ptr(), nullptr);
+//   return std::shared_ptr<Llama>(obj);
+// }
+void createLlama(const std::string& jsn,
           const torch::Tensor &weights
   ) {
-  Llama::BTArg lmaArg;
-  lmaArg._max_batch_tokens = mxBtchTkn;
-  lmaArg.vocabSz = vocabSz;
-  lmaArg.hidSz = hidSz;
-  LlamaA16W4* obj = new LlamaA16W4(lmaArg);
-  obj->setWAndGrd(weights.data_ptr(), nullptr);
-  return std::shared_ptr<LlamaA16W4>(obj);
+    auto const json = nlohmann::json::parse(jsn, nullptr, true/*allow_exceptions*/, true/*ignore_comments*/);
+    int len = parseJsonFieldOr(json,"max_position_embeddings",1024);
+    std::cout<<"max_position_embeddings:"<<len<<std::endl;
 }
 
-torch::Tensor runLlama(std::shared_ptr<LlamaA16W4> lma, const torch::Tensor &inpIdTsr, int mxOutputLen) {
+
+torch::Tensor runLlama(std::shared_ptr<Llama> lma, const torch::Tensor &inpIdTsr, int mxOutputLen) {
   auto options = torch::TensorOptions()
                      .dtype(torch::kInt32)
                      .layout(torch::kStrided)
@@ -61,7 +71,7 @@ torch::Tensor runLlama(std::shared_ptr<LlamaA16W4> lma, const torch::Tensor &inp
 PYBIND11_MODULE(BTLLM_PYBIND_MODULE, m)
 {
   //@# 在c++和py之间传递对象指针,参考 https://pybind11.readthedocs.io/en/stable/advanced/smart_ptrs.html
-  py::class_<LlamaA16W4, std::shared_ptr<LlamaA16W4>>(m, "LlamaA16W4")
+  py::class_<Llama, std::shared_ptr<Llama>>(m, "Llama")
         // .def(py::init<nvinfer1::DataType, int, int, void*>())
         // .def("setName", &Pet::setName)
         ;
