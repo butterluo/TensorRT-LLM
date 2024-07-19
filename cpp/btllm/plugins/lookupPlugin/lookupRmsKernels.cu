@@ -42,46 +42,53 @@ input IDs and get the correct results.
  */
 template <typename T, typename Idx, int tmpNum>
 __global__ void lookupRmsKernel(T* output, Idx const* input, T const* weight, int64_t const token_num, Idx const offset,
-    Idx const size, Idx const n_embed, T const* gamma)
+    Idx const size, Idx const n_elems, T const* __restrict gamma)
 {
     __shared__ int word_index;
     __shared__ float rms;
     constexpr auto num_elems_T = num_elems<T>::value;
     using float_packed_t = typename packed_as<float, num_elems_T>::type;
-    int const n_elems = n_embed / num_elems_T;
+    // int const n_elems = n_embed / num_elems_T;
+    int const n_embed = n_elems * num_elems_T;
+    int curIdx = 0;
+    T tmpArr[tmpNum] = {0};
+    float sqrSum = 0;
+    
     if (threadIdx.x == 0)
     {
         word_index = input[blockIdx.x];
     }
     __syncthreads();
-    int curIdx = 0;
-    T tmpArr[tmpNum] = {0};
-    float sqrSum = 0;
+    
     if (word_index >= 0 && word_index < size) {
-        const float rld = 1.f / float(n_embed);
+        const float_packed_t rld = cuda_cast<float_packed_t,float>(1.f / float(n_embed));
         for (int64_t index = threadIdx.x; index < n_elems; index += blockDim.x) {
             // int64_t const word_index = input[index / n_embed] - offset;
             // Idx const col_index = index % n_embed;
-            T embedding = weight[word_index * n_embed + index];
+            T embedding = weight[word_index * n_elems + index];
             // output[index] = embedding;
             tmpArr[curIdx] = embedding;
             ++curIdx;
-            sqrSum = sqrSum + rld * cuda_cast<float_packed_t,T>(embedding) * cuda_cast<float_packed_t,T>(embedding); //@# MAYBUG
+            sqrSum = sqrSum + cuda_sum<float>( rld * cuda_cast<float_packed_t,T>(embedding) * cuda_cast<float_packed_t,T>(embedding) ); //@# MAYBUG
         } // end for index
 
     }
     
     ///////////////// RMS //////////////////
     float blkSum = blockReduceSum(sqrSum);
+    curIdx = 0;
     if (threadIdx.x == 0) {
       rms = rsqrtf(blkSum + EPS);
     }
     __syncthreads();
-    curIdx = 0;
+    float_packed_t tRms = cuda_cast<float_packed_t,float>(rms);
     for (int i = threadIdx.x; i < n_elems; i += blockDim.x) {
       T tmpVal = tmpArr[curIdx];
       int const index = blockIdx.x * n_elems + i;
-      output[index] = __bfloat162float(tmpVal) * rms * __bfloat162float(gamma[i]);
+      T g = ldg(&gamma[i]);
+      float_packed_t tVal = cuda_cast<float_packed_t,T>(tmpVal) * tRms * cuda_cast<float_packed_t,T>(g);
+      // output[index] = tmpVal * tRms * g;
+      output[index] = cuda_cast<T, float_packed_t>(tVal);
     }
 }
 
@@ -96,14 +103,20 @@ void invokeLookUpRms(T* out, Idx const* input, T const* weight, int64_t const to
     // lookup_kernel<T, Idx><<<grid, block, 0, stream>>>(out, input, weight, token_num, offset, size, n_embed);
 
     dim3 grid(token_num);
-    dim3 block(min(n_embed, 1024));
-    const int flod = n_embed > 1024 ? 1 : ((n_embed + 1023) /1024);
+    constexpr int num_elems_T = num_elems<T>::value;
+    assert(n_embed % num_elems_T); //use macro to avoid assert in release version
+    int packedEmb = n_embed / num_elems_T;
+    dim3 block(min(packedEmb, 1024));
+    // Make sure block.x is multiple of 32 for warp shuffle to work
+    block.x = 32 * ((block.x + 31) / 32);
+
+    const int flod = packedEmb > 1024 ? 1 : ((packedEmb + 1023) /1024);//TODO remove, use n_embed as condition instead
     if(flod < 2) {
-      lookupRmsKernel<T, Idx, 1><<<grid, block, 0, stream>>>(out, input, weight, token_num, offset, size, n_embed, gamma);
+      lookupRmsKernel<T, Idx, 1><<<grid, block, 0, stream>>>(out, input, weight, token_num, offset, size, packedEmb, gamma);
     } else if (flod < 5) {
-      lookupRmsKernel<T, Idx, 4><<<grid, block, 0, stream>>>(out, input, weight, token_num, offset, size, n_embed, gamma);
+      lookupRmsKernel<T, Idx, 4><<<grid, block, 0, stream>>>(out, input, weight, token_num, offset, size, packedEmb, gamma);
     } else {
-      lookupRmsKernel<T, Idx, 8><<<grid, block, 0, stream>>>(out, input, weight, token_num, offset, size, n_embed, gamma);
+      lookupRmsKernel<T, Idx, 8><<<grid, block, 0, stream>>>(out, input, weight, token_num, offset, size, packedEmb, gamma);
     }
     
 }

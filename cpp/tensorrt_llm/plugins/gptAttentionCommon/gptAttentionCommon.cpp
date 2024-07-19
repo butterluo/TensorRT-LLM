@@ -555,7 +555,7 @@ GPTAttentionPluginCommon::GPTAttentionPluginCommon(void const* data, size_t leng
 size_t GPTAttentionPluginCommon::getWorkspaceSizeForContext(nvinfer1::DataType type, int32_t nbReq,
     int32_t input_seq_length, int32_t max_attention_window, int32_t cross_qkv_length,
     int32_t max_num_tokens) const noexcept
-{
+{//@#lma init/...10.1             //@#lma init/...12.1???
     int const local_hidden_units_qo = mNumHeads * getHeadSize();
     int const local_hidden_units_kv = mNumKVHeads * getHeadSize();
     bool const chunked_context_support = mEnableContextFMHA && mPagedKVCache && mPagedContextFMHA;
@@ -615,7 +615,7 @@ size_t GPTAttentionPluginCommon::getWorkspaceSizeForContext(nvinfer1::DataType t
 
 size_t GPTAttentionPluginCommon::getWorkspaceSizeForGeneration(
     nvinfer1::DataType type, int32_t total_num_seq, int32_t max_attention_window, int32_t max_num_tokens) const noexcept
-{
+{//@#lma init/...10.2             //@#lma init/...12.2???
     int const local_hidden_units_qo = mNumHeads * getHeadSize();
     int const local_hidden_units_kv = mNumKVHeads * getHeadSize();
 
@@ -662,7 +662,7 @@ size_t GPTAttentionPluginCommon::getWorkspaceSizeForGeneration(
 }
 
 int GPTAttentionPluginCommon::getMaxNumSeqLenTile(int batch_beam_size) const
-{
+{//@#lma init/...10.2.1
     if (mMultiBlockMode)
     {
         // And we allocate the buffer based on the maximum number of blocks per sequence (batch_beam_size = 1).
@@ -1477,7 +1477,7 @@ template void GPTAttentionPluginCommon::prepareEnqueueGeneration<__nv_bfloat16, 
 #endif
 
 int GPTAttentionPluginCommon::initialize() noexcept
-{
+{//@#lma init/3.1 ???
     auto cublasHandle = getCublasHandle();
     auto cublasLtHandle = getCublasLtHandle();
 

@@ -19,27 +19,15 @@ using btllm::mdl::Llama;
 
 
 
-// std::shared_ptr<Llama> createLlama(int mxBtchTkn,
-//           int vocabSz,
-//           int hidSz,
-//           const torch::Tensor &weights
-//   ) {
-//   Llama::BTArg lmaArg;
-//   lmaArg._max_batch_tokens = mxBtchTkn;
-//   lmaArg.vocabSz = vocabSz;
-//   lmaArg.hidSz = hidSz;
-//   Llama* obj = new Llama(lmaArg);
-//   obj->setWAndGrd(weights.data_ptr(), nullptr);
-//   return std::shared_ptr<Llama>(obj);
-// }
-void createLlama(const std::string& jsn,
+std::shared_ptr<Llama> createLlama(const std::string& jsn, size_t max_batch_tokens,
           const torch::Tensor &weights
   ) {
-    auto const json = nlohmann::json::parse(jsn, nullptr, true/*allow_exceptions*/, true/*ignore_comments*/);
-    int len = parseJsonFieldOr(json,"max_position_embeddings",1024);
-    std::cout<<"max_position_embeddings:"<<len<<std::endl;
+  Llama* obj = new Llama(jsn, max_batch_tokens);
+  // tensorrt_llm::common::check_cuda_error(cudaGetLastError());
+  obj->setWAndGrd(weights.data_ptr(), nullptr);
+  // tensorrt_llm::common::check_cuda_error(cudaGetLastError());
+  return std::shared_ptr<Llama>(obj);
 }
-
 
 torch::Tensor runLlama(std::shared_ptr<Llama> lma, const torch::Tensor &inpIdTsr, int mxOutputLen) {
   auto options = torch::TensorOptions()
@@ -55,14 +43,15 @@ torch::Tensor runLlama(std::shared_ptr<Llama> lma, const torch::Tensor &inpIdTsr
   lma->initRunParam(batchSz, seqLen, mxOutputLen);
   torch::Tensor output = torch::empty({mxOutputLen}, options).contiguous();
   lma->Forward(reinterpret_cast<int*>(inpIdTsr.data_ptr()), reinterpret_cast<int*>(output.data_ptr()));
-
+  // tensorrt_llm::common::check_cuda_error(cudaGetLastError());
+  
   auto embOutOpt = torch::TensorOptions()
                      .dtype(torch::kBFloat16)
                      .layout(torch::kStrided)
                      .device(inpIdTsr.device());
   torch::Tensor embOutTsr = torch::empty({batchSz, seqLen, hidSz}, embOutOpt).contiguous();
   tensorrt_llm::common::check_cuda_error(cudaMemcpy(embOutTsr.data_ptr(), lma->_buf,
-                              batchSz*seqLen*hidSz * 2/* sizeof(bf16) */, cudaMemcpyDeviceToDevice/* cudaMemcpyDefault */));
+                              size_t(batchSz*seqLen*hidSz * 2)/* sizeof(bf16) */, cudaMemcpyDeviceToDevice/*cudaMemcpyDefault*/));
   
   return embOutTsr;
 }

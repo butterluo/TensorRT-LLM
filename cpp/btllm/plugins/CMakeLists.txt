@@ -60,6 +60,7 @@ include_directories(${TRTLLMDIR_SRC}/plugins/common)
 include_directories(common)
 add_subdirectory(common)
 
+set_source_files_properties(${PLUGIN_CU_SOURCES} PROPERTIES COMPILE_FLAGS "-G -O0 -Xptxas=-O0 -Xptxas=-disable-optimizer-consts")
 
 # Set gencodes
 list(APPEND PLUGIN_SOURCES "${PLUGIN_CU_SOURCES}")

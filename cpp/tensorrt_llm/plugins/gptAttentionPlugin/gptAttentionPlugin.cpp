@@ -59,7 +59,7 @@ GPTAttentionPlugin::GPTAttentionPlugin(int layer_idx, int num_heads, int vision_
         cross_attention, max_distance, pos_shift_enabled, dense_context_fmha, use_paged_context_fmha,
         use_fp8_context_fmha, use_cache, is_spec_decoding_enabled)
 {
-    initEntryIdx();
+    initEntryIdx();//@#lma init/1
 }
 
 GPTAttentionPlugin::GPTAttentionPlugin(void const* data, size_t length)
@@ -69,7 +69,7 @@ GPTAttentionPlugin::GPTAttentionPlugin(void const* data, size_t length)
 }
 
 bool GPTAttentionPlugin::isEntryUsed(IdxEntry const& entry) const
-{
+{//@#lma init/1.1.1
     switch (entry)
     {
     case IdxEntry::QKV_TENSOR: return true;
@@ -105,13 +105,13 @@ bool GPTAttentionPlugin::isEntryUsed(IdxEntry const& entry) const
 }
 
 void GPTAttentionPlugin::initEntryIdx()
-{
+{//@#lma init/1.1
     mEntryIdx.resize(static_cast<size_t>(IdxEntry::ENUM_SIZE));
     size_t entryIdx = 0;
     for (int i = 0; i < static_cast<size_t>(IdxEntry::ENUM_SIZE); i++)
     {
         mEntryIdx[i] = entryIdx;
-        entryIdx += isEntryUsed(static_cast<IdxEntry>(i));
+        entryIdx += isEntryUsed(static_cast<IdxEntry>(i));//???
     }
 }
 
@@ -124,12 +124,12 @@ GPTAttentionPlugin::IndexType GPTAttentionPlugin::getIdx(IdxEntry const& entry) 
 
 // IPluginV2DynamicExt Methods
 GPTAttentionPlugin* GPTAttentionPlugin::clone() const noexcept
-{
+{//@#lma init/3 ???
     return dynamic_cast<GPTAttentionPlugin*>(this->cloneImpl<GPTAttentionPlugin>());
 }
 
 static int getPackedTensorHiddenDimIndex(bool removePadding)
-{
+{//@#lma init/5.1
     return removePadding ? 1 : 2;
 }
 
@@ -159,7 +159,7 @@ int GPTAttentionPlugin::getGenerationInputSequenceLength(
 //     head_size]
 nvinfer1::DimsExprs GPTAttentionPlugin::getOutputDimensions(
     int outputIndex, nvinfer1::DimsExprs const* inputs, int nbInputs, nvinfer1::IExprBuilder& exprBuilder) noexcept
-{
+{//@#lma init/5
     TLLM_CHECK(outputIndex == 0 || (!mPagedKVCache && useKVCache() && outputIndex == 1));
     if (outputIndex == 0)
     {
@@ -254,7 +254,7 @@ bool GPTAttentionPlugin::supportsFormatCombination(
 template <typename T, typename KVCacheBuffer>
 void GPTAttentionPlugin::configurePluginImpl(nvinfer1::DynamicPluginTensorDesc const* in, int nbInputs,
     nvinfer1::DynamicPluginTensorDesc const* out, int nbOutputs) noexcept
-{
+{//@#lma init/...11.1.1
     TLLM_CHECK(mHeadSize > 0);
 
     int const beamWidth
@@ -307,7 +307,7 @@ void GPTAttentionPlugin::configurePluginImpl(nvinfer1::DynamicPluginTensorDesc c
 template <typename T>
 void GPTAttentionPlugin::configurePluginDispatchKVCacheType(nvinfer1::DynamicPluginTensorDesc const* in, int nbInputs,
     nvinfer1::DynamicPluginTensorDesc const* out, int nbOutputs) noexcept
-{
+{//@#lma init/...11.1
     if (mPagedKVCache)
     {
         configurePluginImpl<T, KVBlockArray>(in, nbInputs, out, nbOutputs);
@@ -331,7 +331,7 @@ void GPTAttentionPlugin::configurePlugin(nvinfer1::DynamicPluginTensorDesc const
     }
 #ifdef ENABLE_BF16
     else if (mType == nvinfer1::DataType::kBF16)
-    {
+    {//@#lma init/...11
         configurePluginDispatchKVCacheType<__nv_bfloat16>(in, nbInputs, out, nbOutputs);
     }
 #endif
@@ -339,7 +339,7 @@ void GPTAttentionPlugin::configurePlugin(nvinfer1::DynamicPluginTensorDesc const
 
 size_t GPTAttentionPlugin::getWorkspaceSize(nvinfer1::PluginTensorDesc const* inputs, int nbInputs,
     nvinfer1::PluginTensorDesc const* outputs, int nbOutputs) const noexcept
-{
+{//@#lma init/...10 don't know when call it    //@#lma init/...12 ???
     int const max_context_length = mMaxContextLength;
     int const cross_qkv_length = isCrossAttention() ? inputs[getIdx(IdxEntry::CROSS_QKV_LENGTH)].dims.d[0] : 0;
     int const nbReq = inputs[getIdx(IdxEntry::CONTEXT_LENGTHS)].dims.d[0];
@@ -377,7 +377,7 @@ size_t GPTAttentionPlugin::getWorkspaceSize(nvinfer1::PluginTensorDesc const* in
 }
 
 static size_t getStride(nvinfer1::Dims const& dims, int n)
-{
+{//call from enqueueSome
     TLLM_CHECK(n >= 0 && n < dims.nbDims);
     return std::accumulate(dims.d + n + 1, dims.d + dims.nbDims, 1, std::multiplies<size_t>{});
 }
@@ -386,7 +386,7 @@ template <typename T, typename KVCacheBuffer>
 int GPTAttentionPlugin::enqueueImpl(nvinfer1::PluginTensorDesc const* inputDesc,
     nvinfer1::PluginTensorDesc const* outputDesc, void const* const* inputs, void* const* outputs, void* workspace,
     cudaStream_t stream)
-{
+{//@#lma run/1
     int32_t const nbSeq = inputDesc[getIdx(IdxEntry::CONTEXT_LENGTHS)].dims.d[0];
     int32_t const beam_width = useKVCache() ? inputDesc[getIdx(IdxEntry::CACHE_INDIR)].dims.d[1] : 1;
     RequestType const* reqTypes = static_cast<RequestType const*>(inputs[getIdx(IdxEntry::REQUEST_TYPES)]);
@@ -446,7 +446,7 @@ template <typename T, typename KVCacheBuffer>
 int GPTAttentionPlugin::enqueueSome(int32_t seqIdxBeg, int32_t localNbSeq, int32_t tokenIdxBeg, int32_t localNbTokens,
     nvinfer1::PluginTensorDesc const* inputDesc, nvinfer1::PluginTensorDesc const* outputDesc,
     void const* const* inputs, void* const* outputs, void* workspace, cudaStream_t stream)
-{
+{//call from enqueueImpl
     //     relative_attention_bias [head_num, max_seq_len, max_seq_len] (optional in relative position)
     //                          or [head_num, num_buckets] (optional in implicit relative attention)
     //     cross_qkv [batch_size, seq_len, 3 * local_hidden_size] or [num_tokens, 3 * local_hidden_size]
@@ -788,7 +788,7 @@ int GPTAttentionPlugin::enqueue(nvinfer1::PluginTensorDesc const* inputDesc,
 // IPluginV2Ext Methods
 nvinfer1::DataType GPTAttentionPlugin::getOutputDataType(
     int index, nvinfer1::DataType const* inputTypes, int nbInputs) const noexcept
-{
+{//@#lma init/2 seems called by py side        //@#lma init/4 after clone???
     TLLM_CHECK(index == 0 || (!mPagedKVCache && index == 1));
     if (index == 0)
     {

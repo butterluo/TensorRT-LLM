@@ -34,7 +34,7 @@ BTArg mArg;
 
 Llama() = delete;
 
-Llama(const std::string& jsn);
+Llama(const std::string& jsn, size_t max_batch_tokens);
 
 ~Llama() = default;
 
@@ -49,7 +49,7 @@ void initRunParam(int batchSz, int seqLen, int mxOutputLen, bool initAll=true);
 void Forward(const int *input_ptr, int *out_ptr);
 
 
-char* _buf = nullptr;
+void* _buf = nullptr;
 
 private:
 

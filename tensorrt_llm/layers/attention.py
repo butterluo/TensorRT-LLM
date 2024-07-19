@@ -418,12 +418,12 @@ class Attention(Module):
                                tp_group=tp_group,
                                tp_size=tp_size)
 
-        # per-layer relative attention table
+        # per-layer relative attention table #@#lma and qwen are not relative attn
         if relative_attention:
             self.rel_attn_table = Parameter(shape=(num_attention_heads //
                                                    tp_size, num_buckets),
                                             dtype=dtype)
-        self.qk_layernorm = qk_layernorm
+        self.qk_layernorm = qk_layernorm #@#lma and qwen are not qk_layernorm
         if self.qk_layernorm:
             self.q_layernorm = LayerNorm(self.attention_head_size, dtype=dtype)
             self.k_layernorm = LayerNorm(self.attention_head_size, dtype=dtype)
@@ -432,7 +432,7 @@ class Attention(Module):
         if clip_qkv is not None:
             self.clip_qkv = fp32_array([clip_qkv])
         else:
-            self.clip_qkv = None
+            self.clip_qkv = None #@#lma
 
         self.skip_cross_qkv = skip_cross_qkv
 
@@ -481,7 +481,7 @@ class Attention(Module):
                                  dim=1)
                 qkv = [tensor + lora for tensor, lora in zip(qkv, qkv_lora)]
         else:
-            qkv = self.qkv(hidden_states, qkv_lora_params)
+            qkv = self.qkv(hidden_states, qkv_lora_params)#@#lma
 
         if self.clip_qkv is not None:
             qkv = clip(qkv, -self.clip_qkv, self.clip_qkv)
@@ -491,7 +491,7 @@ class Attention(Module):
                 for tensor in qkv:
                     assert tensor.ndim() == 2
             else:
-                assert qkv.ndim() == 2
+                assert qkv.ndim() == 2 #@#lma
 
         if default_net().plugin_config.lora_plugin and qkv_lora_params is None and lora_layer_params is not None:
             if not self.cross_attention:
@@ -623,7 +623,7 @@ class Attention(Module):
                 cross_qkv = cross_qkv_true
 
         if default_net().plugin_config.gpt_attention_plugin:
-            if self.cross_attention and (past_key_value is not None):
+            if self.cross_attention and (past_key_value is not None): #@#lma cross_attention=False BUT past_key_value is not None
                 past_key_value = kv_cache_params.past_key_value[1]
             assert self.attention_mask_type in [
                 AttentionMaskType.causal, AttentionMaskType.bidirectional,
@@ -682,7 +682,7 @@ class Attention(Module):
                                                  [1, shape(long_factors, 1)]))
                 rope_scaling_factors = rope_scaling_factors.view((-1, ))
             else:
-                # Rotary cos/sin cache.
+                # Rotary cos/sin cache. @#lma
                 rotary_cos_sin = self.embed_positions_for_gpt_attention.value if self.position_embedding_type.is_rope() else None
                 rope_scaling_factors = None
             mscale = self.mscale if self.position_embedding_type == PositionEmbeddingType.long_rope else None

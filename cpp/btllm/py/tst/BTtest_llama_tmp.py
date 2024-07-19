@@ -9,8 +9,8 @@ sys.path.append(f"{PRJ_ROOT_PATH}/tests/")
 sys.path.append(f"{PRJ_ROOT_PATH}/tests/quantization/")
 sys.path.append(f"{PRJ_ROOT_PATH}/tests/model/")
 
-
 import random
+import sys
 import tempfile
 import unittest
 from itertools import product
@@ -31,19 +31,16 @@ from tensorrt_llm.models.modeling_utils import PretrainedConfig, optimize_model
 from tensorrt_llm.network import net_guard
 from tensorrt_llm.plugin.plugin import ContextFMHAType
 
-# sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from utils.llm_data import llm_models_root
 from utils.util import (skip_bf16_pre_ampere, skip_fp32_accum_pre_ampere,
                         unittest_name_func)
 
-from btllm.pybind.btpybind import *
 
-
-# class TestLLaMA(unittest.TestCase):
 EOS_TOKEN = 2
 PAD_TOKEN = 2
 
-def _gen_tensorrt_llm_network(network, hf_llama,
+def _gen_tensorrt_llm_network( network, hf_llama,
                               llama_config: LlamaConfig, batch_size,
                               beam_width, input_len, output_len, dtype,
                               rank, tensor_parallel, **opt_flags):
@@ -112,7 +109,7 @@ def _gen_tensorrt_llm_network(network, hf_llama,
 
     return network
 
-def _gen_tensorrt_llm_engine(        
+def _gen_tensorrt_llm_engine(
                               dtype,
                               rank,
                               world_size,
@@ -224,8 +221,8 @@ def load_test_cases():
                         }))  # GQA
     return test_cases
 
-# @parameterized.expand(load_test_cases, name_func=unittest_name_func)  
-def test_llama(use_refit, fast_building, context_fmha_flag,
+# @parameterized.expand(load_test_cases, name_func=unittest_name_func)
+def test_llama( use_refit, fast_building, context_fmha_flag,
                 enable_remove_input_padding, dtype, num_kv_heads, hidden_act,
                 opt_flags):
 
@@ -239,7 +236,7 @@ def test_llama(use_refit, fast_building, context_fmha_flag,
     use_plugin = True  # gpt plugin
     batch_size = 4
     beam_width = 1
-    input_len = 5 #4
+    input_len = 4
     output_len = 2
     max_seq_len = input_len + output_len
     world_size = 1
@@ -303,125 +300,143 @@ def test_llama(use_refit, fast_building, context_fmha_flag,
     sequence_length_buffer = ctx_context_lengths.detach().clone()
 
     with torch.no_grad():
-        hf_outputs = hf_llama.forward(ctx_ids, output_hidden_states=True)
+        hf_outputs = hf_llama.forward(ctx_ids)
     torch.cuda.synchronize()
     ref = hf_outputs.logits[:, -1, :]
-    ###################### Remove origin and Add below
-    w = mrgeFfW(hf_llama).cuda()
-    btref = hf_llama.model.embed_tokens(ctx_ids)
-    btref = hf_llama.model.layers[0].input_layernorm(btref)
-    btref = btref.clone().detach()
-    print("-----------------------------btref")
-    print(btref)
-    jsnStr = llama_config.to_json_string(use_diff=False)
-    print(jsnStr)
-    lma = createLlama(
-            jsnStr,
-            256, #batch_size * llama_config.max_position_embeddings,  can be assign a different val manually
-            w
-            )
 
-    btres = runLlama(lma, ctx_ids, output_len)
-    print("-----------------------------btres")
-    print(btres)
-    np.testing.assert_allclose(btref.to(torch.float32).cpu().numpy(),
-                                   btres.to(torch.float32).cpu().numpy(),
-                                   atol=0.12,verbose=True)
-    print("---------DONE----------")
+    if enable_remove_input_padding:
+        ctx_ids = ctx_ids.view([batch_size * input_len])
+        ctx_position_ids = ctx_position_ids.view([batch_size * input_len])
+        ctx_last_token_ids = torch.cumsum(ctx_last_token_ids, dim=0).int()
 
-def calc_offset(sizes):
-    offsets = [int(0)]
-    tmp = 0
-    for x in sizes:
-        tmp += x
-        offsets.append(int(tmp))
-    return offsets
-def cpyWeights(para, para_offset, w, i):
-    cur_para =  para.data.narrow(
-        0, para_offset[i], para_offset[i + 1] - para_offset[i]
-    )
-    assert cur_para.numel() == w.numel()
-    cur_para.copy_(w.view(-1))
-def mrgeFfW(hf:LlamaForCausalLM):
-    cfg:LlamaConfig = hf.model.config
-    vcbSz = cfg.vocab_size
-    hs = cfg.hidden_size
-    ims = cfg.intermediate_size
-    hsKV = cfg.num_key_value_heads *  (cfg.hidden_size / cfg.num_attention_heads)
-    sizes = [vcbSz * hs]
-    for i in range(cfg.num_hidden_layers):
-        subSz = [
-            hs,  # attn_nw
-            hs * (hs + 2 * hsKV) ,  # attn_qkvw
-            # hs * 3,  # attn_qkvb
-            hs * hs,  # attn_ow
-            # hs,  # attn_ob
-            # hs,  # attn_nb
-            hs,  # ffn_nw
-            hs * ims,  # inter_w (up_w)
-            # ims,  # inter_b
-            hs * ims,  # gate_w
-            hs * ims,  # output_w
-            # hs,  # output_b
-        ]
-        sizes.extend(subSz)
-    sizes.extend([
-        hs, hs * vcbSz
-    ])
-    para_offset = calc_offset(sizes)
-    # para = torch.nn.Parameter(torch.Tensor(para_offset[-1]).to(torch.bfloat16))
-    para = torch.Tensor(para_offset[-1]).to(torch.bfloat16)
+    cache_indirections = [
+        torch.full((
+            batch_size,
+            beam_width,
+            max_seq_len,
+        ),
+                    0,
+                    dtype=torch.int32,
+                    device='cuda'),
+        torch.full((
+            batch_size,
+            beam_width,
+            max_seq_len,
+        ),
+                    0,
+                    dtype=torch.int32,
+                    device='cuda')
+    ]  # ping-pong buffers
 
-    idx = 0
-    cpyWeights(para, para_offset, 
-               hf.model.embed_tokens.weight.to(torch.bfloat16), idx)
-    idx+=1
-    for i in range(cfg.num_hidden_layers):
-        cpyWeights(para, para_offset, 
-            hf.model.layers[i].input_layernorm.weight.to(torch.bfloat16), idx)
-        idx+=1
-        #@# assume attn_implementation is eager
-        qkvw = torch.cat([
-            hf.model.layers[i].self_attn.q_proj.weight.to(torch.bfloat16),
-            hf.model.layers[i].self_attn.k_proj.weight.to(torch.bfloat16),
-            hf.model.layers[i].self_attn.v_proj.weight.to(torch.bfloat16)
-        ], dim=0)
-        cpyWeights(para, para_offset, 
-            qkvw.to(torch.bfloat16), idx)
-        idx+=1
-        cpyWeights(para, para_offset, 
-            hf.model.layers[i].self_attn.o_proj.weight.to(torch.bfloat16), idx)
-        idx+=1
-        cpyWeights(para, para_offset, 
-            hf.model.layers[i].post_attention_layernorm.weight.to(torch.bfloat16), idx)
-        idx+=1
-        cpyWeights(para, para_offset, 
-            hf.model.layers[i].mlp.up_proj.weight.to(torch.bfloat16), idx)
-        idx+=1
-        cpyWeights(para, para_offset, 
-            hf.model.layers[i].mlp.gate_proj.weight.to(torch.bfloat16), idx)
-        idx+=1
-        cpyWeights(para, para_offset, 
-            hf.model.layers[i].mlp.down_proj.weight.to(torch.bfloat16), idx)
-        idx+=1
-    cpyWeights(para, para_offset, 
-            hf.model.norm.weight.to(torch.bfloat16), idx)
-    idx+=1
-    cpyWeights(para, para_offset, 
-            hf.lm_head.weight.to(torch.bfloat16), idx)
-    idx+=1
-    assert(idx == len(sizes))
-    return para
+    ctx_buffer = {
+        'input_ids': ctx_ids,
+        'context_lengths': ctx_context_lengths,
+        'position_ids': ctx_position_ids,
+        'last_token_ids': ctx_last_token_ids,
+        'cache_indirection': cache_indirections[0],
+        'host_request_types': ctx_host_request_types,
+    }
+    if enable_remove_input_padding:
+        ctx_buffer['host_context_lengths'] = ctx_context_lengths.cpu()
 
+    ctx_shape = {k: v.shape for k, v in ctx_buffer.items()}
 
+    kv_shape = (batch_size, 2, llama_config.num_key_value_heads,
+                max_seq_len, head_size)
+    ctx_buffer[f'host_max_attention_window_sizes'] = torch.tensor(
+        [max_seq_len] * llama_config.num_hidden_layers, dtype=torch.int32)
+    ctx_shape[f'host_max_attention_window_sizes'] = (
+        llama_config.num_hidden_layers, )
+    for i in range(llama_config.num_hidden_layers):
+        ctx_shape[f'past_key_value_{i}'] = kv_shape
+        ctx_buffer[f'past_key_value_{i}'] = key_value_cache_buffers[i]
+        ctx_buffer[f'present_key_value_{i}'] = key_value_cache_buffers[i]
+    ctx_buffer['sequence_length'] = sequence_length_buffer
+    ctx_shape['sequence_length'] = ctx_buffer['sequence_length'].shape
+    ctx_shape['host_past_key_value_lengths'] = (batch_size, )
+    ctx_buffer['host_past_key_value_lengths'] = torch.tensor(
+        [0] * batch_size, dtype=torch.int32)
+    ctx_shape['host_sink_token_length'] = (1, )
+    ctx_buffer['host_sink_token_length'] = torch.tensor([0],
+                                                        dtype=torch.int32)
 
+    context = runtime.ctx_context
+    runtime._set_shape(context, ctx_shape)
+    runtime._set_buffer(context, ctx_buffer)
+    runtime._run(context)
+    torch.cuda.synchronize()
+    res = ctx_buffer['logits']
 
+    np.testing.assert_allclose(ref.to(torch.float32).cpu().numpy(),
+                                res.to(torch.float32).cpu().numpy(),
+                                atol=0.12)
 
+    # compare generation
+    step = 1
+    step1_id = torch.randint(100, (batch_size, 1)).int().cuda()
+    gen_context_lengths = ctx_context_lengths.clone()
+    gen_position_ids = torch.ones_like(step1_id).int().cuda() * input_len
+    gen_last_token_ids = torch.zeros_like(gen_context_lengths).int().cuda()
+    gen_host_request_types = torch.tensor([1] * batch_size,
+                                          dtype=torch.int32)
 
+    with torch.no_grad():
+        hf_outputs = hf_llama.forward(
+            step1_id,
+            past_key_values=hf_outputs.past_key_values,
+            use_cache=True)
+    torch.cuda.synchronize()
+    ref = hf_outputs.logits[:, -1, :]
 
+    if enable_remove_input_padding:
+        step1_id = step1_id.view([batch_size])
+        gen_position_ids = gen_position_ids.view([batch_size])
+        gen_last_token_ids = torch.ones_like(
+            gen_context_lengths).int().cuda()
+        gen_last_token_ids = torch.cumsum(gen_last_token_ids, dim=0).int()
 
+    step1_buffer = {
+        'input_ids': step1_id,
+        'context_lengths': gen_context_lengths,
+        'position_ids': gen_position_ids,
+        'last_token_ids': gen_last_token_ids,
+        'host_request_types': gen_host_request_types,
+        'cache_indirection': cache_indirections[1],
+    }
+    if enable_remove_input_padding:
+        step1_buffer['host_context_lengths'] = gen_context_lengths.cpu()
 
+    step1_shape = {k: v.shape for k, v in step1_buffer.items()}
 
+    step1_shape[f'host_max_attention_window_sizes'] = (
+        llama_config.num_hidden_layers, )
+    for i in range(llama_config.num_hidden_layers):
+        step1_shape[f'past_key_value_{i}'] = kv_shape
+    step1_shape['sequence_length'] = (batch_size, )
+    step1_shape['host_past_key_value_lengths'] = (batch_size, )
+    step1_shape['host_sink_token_length'] = (1, )
+    step1_buffer[f'host_max_attention_window_sizes'] = torch.tensor(
+        [max_seq_len] * llama_config.num_hidden_layers, dtype=torch.int32)
+    for i in range(llama_config.num_hidden_layers):
+        step1_buffer[f'past_key_value_{i}'] = key_value_cache_buffers[i]
+        step1_buffer[f'present_key_value_{i}'] = key_value_cache_buffers[i]
+    step1_buffer[
+        'host_past_key_value_lengths'] = sequence_length_buffer.cpu()
+    sequence_length_buffer = torch.add(sequence_length_buffer, step)
+    step1_buffer['sequence_length'] = sequence_length_buffer
+    step1_buffer['host_sink_token_length'] = torch.tensor([0],
+                                                          dtype=torch.int32)
+
+    context = runtime.context_1
+    runtime._set_shape(context, step1_shape)
+    runtime._set_buffer(context, step1_buffer)
+    runtime._run(context)
+    torch.cuda.synchronize()
+    res = step1_buffer['logits']
+
+    np.testing.assert_allclose(ref.to(torch.float32).cpu().numpy(),
+                                res.to(torch.float32).cpu().numpy(),
+                                atol=0.12)
 
 
 
@@ -431,7 +446,7 @@ if __name__ == '__main__':
         use_refit=False, 
         fast_building=True, 
         context_fmha_flag=ContextFMHAType.enabled,
-        enable_remove_input_padding=False, 
+        enable_remove_input_padding=True, 
         dtype='bfloat16', 
         num_kv_heads=0, #@#???
         hidden_act='silu',
