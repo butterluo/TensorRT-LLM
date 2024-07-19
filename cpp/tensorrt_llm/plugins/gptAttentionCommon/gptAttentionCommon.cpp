@@ -1542,7 +1542,7 @@ int GPTAttentionPluginCommon::initialize() noexcept
                 mNumHeads, mNumKVHeads);
         }
 
-        mDecoderXQARunner.reset(new DecoderXQARunner(
+        mDecoderXQARunner.reset(new DecoderXQARunner(//@# ??? FusedMHARunnerV2 和 DecoderXQARunner 为什么不能是同一个 
             &mDecoderXQARunnerResource, xqa_runner_data_type, mNumHeads, mNumKVHeads, mHeadSize, mMultiBlockMode));
     }
     else if (mIsSpecDecodingEnabled)
