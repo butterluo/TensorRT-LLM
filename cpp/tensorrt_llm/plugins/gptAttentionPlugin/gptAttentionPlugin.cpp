@@ -389,11 +389,11 @@ int GPTAttentionPlugin::enqueueImpl(nvinfer1::PluginTensorDesc const* inputDesc,
 {//@#lma run/1
     int32_t const nbSeq = inputDesc[getIdx(IdxEntry::CONTEXT_LENGTHS)].dims.d[0];
     int32_t const beam_width = useKVCache() ? inputDesc[getIdx(IdxEntry::CACHE_INDIR)].dims.d[1] : 1;
-    RequestType const* reqTypes = static_cast<RequestType const*>(inputs[getIdx(IdxEntry::REQUEST_TYPES)]);
+    RequestType const* reqTypes = static_cast<RequestType const*>(inputs[getIdx(IdxEntry::REQUEST_TYPES)]);//@#??? 这里面是一个个tkn?并标注有tkn是属于ctx的还是属于gen的?
 
     int32_t nbContextRequests = 0;
     int32_t contextTokenIdxEnd = 0;
-    // count context requests
+    // count context requests @#???
     for (int32_t seqIdx = 0; seqIdx < nbSeq; seqIdx++)
     {
         if (reqTypes[seqIdx] != RequestType::kCONTEXT)
@@ -401,17 +401,17 @@ int GPTAttentionPlugin::enqueueImpl(nvinfer1::PluginTensorDesc const* inputDesc,
             break;
         }
         ++nbContextRequests;
-        contextTokenIdxEnd += mRemovePadding
+        contextTokenIdxEnd += (mRemovePadding
             ? static_cast<int32_t const*>(inputs[getIdx(IdxEntry::HOST_CONTEXT_LENGTH)])[seqIdx]
-            : inputDesc[getIdx(IdxEntry::QKV_TENSOR)].dims.d[1];
+            : inputDesc[getIdx(IdxEntry::QKV_TENSOR)].dims.d[1]);
     }
     for (int32_t seqIdx = nbContextRequests; seqIdx < nbSeq; seqIdx++)
     {
         TLLM_CHECK(reqTypes[seqIdx] == RequestType::kGENERATION);
     }
 
-    // mixed requests require mRemovePadding and mPagedKVCache
-    if (nbContextRequests != 0 && nbContextRequests != nbSeq)
+    // mixed requests require mRemovePadding and mPagedKVCache 
+    if (nbContextRequests != 0 && nbContextRequests != nbSeq)//@#??? 只用mRemovePadding不行么
     {
         TLLM_CHECK(mRemovePadding && mPagedKVCache);
     }
@@ -429,12 +429,12 @@ int GPTAttentionPlugin::enqueueImpl(nvinfer1::PluginTensorDesc const* inputDesc,
     {
         auto seqIdxBeg = nbContextRequests;
         auto tokenIdxBeg = contextTokenIdxEnd;
-        // if mRemovePadding is true, we may have IFB, and need to remove context tokens.
+        // if mRemovePadding is true, we may have IFB, and need to remove context tokens. @#???
         // if mRemovePadding is false, it is only generation requests, so just multiply batch_beam and seq_len (May not
         // 1 for Parallel Decoding)
-        auto localNbTokens = mRemovePadding
+        auto localNbTokens = (mRemovePadding
             ? inputDesc[getIdx(IdxEntry::QKV_TENSOR)].dims.d[0] - contextTokenIdxEnd
-            : inputDesc[getIdx(IdxEntry::QKV_TENSOR)].dims.d[0] * inputDesc[getIdx(IdxEntry::QKV_TENSOR)].dims.d[1];
+            : inputDesc[getIdx(IdxEntry::QKV_TENSOR)].dims.d[0] * inputDesc[getIdx(IdxEntry::QKV_TENSOR)].dims.d[1]);
         enqueueSome<T, KVCacheBuffer>(seqIdxBeg, nbGenerationSeq, tokenIdxBeg, localNbTokens, inputDesc, outputDesc,
             inputs, outputs, workspace, stream);
     }
@@ -604,7 +604,7 @@ int GPTAttentionPlugin::enqueueSome(int32_t seqIdxBeg, int32_t localNbSeq, int32
     }
 
     T* context_buf_
-        = (T*) (outputs[0]) + outputDesc[0].dims.d[getPackedTensorHiddenDimIndex(mRemovePadding)] * tokenIdxBeg;
+        = (T*) (outputs[0]) + outputDesc[0].dims.d[getPackedTensorHiddenDimIndex(mRemovePadding)] * tokenIdxBeg;//@#???
     void* key_value_cache = nullptr;
     if (useKVCache() && !mPagedKVCache)
     {

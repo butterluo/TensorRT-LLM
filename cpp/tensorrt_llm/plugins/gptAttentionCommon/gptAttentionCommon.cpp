@@ -155,7 +155,7 @@ bool GPTAttentionPluginCommon::convertMMHAParamsToXQAParams(tensorrt_llm::kernel
     {
         return false;
     }
-    memset(&xqaParams, 0, sizeof(XQAParams));
+    memset(&xqaParams, 0, sizeof(XQAParams));//@#CPP
     xqaParams.data_type = ConvertMMHAToXQAParamsHelper<T, KVCacheBuffer>::data_type;
 
     xqaParams.layer_idx = mLayerIdx;
@@ -722,7 +722,7 @@ int GPTAttentionPluginCommon::enqueueContext(EnqueueContextParams<T, KVCacheBuff
     int* block_counter = nullptr;
 
     auto cublasHandle = mCublasWrapper->getCublasHandle();
-    TLLM_CUDA_CHECK(cublasSetStream(cublasHandle, stream));
+    TLLM_CUDA_CHECK(cublasSetStream(cublasHandle, stream));//@#??? cublas不是之前就初始化了么，这里是换一个stream么
     mCublasWrapper->setStream(stream);
     mCublasWrapper->setWorkspace(params.workspace);
     if constexpr (std::is_same_v<T, half>)

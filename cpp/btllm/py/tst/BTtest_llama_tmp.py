@@ -326,7 +326,7 @@ def test_llama( use_refit, fast_building, context_fmha_flag,
                     0,
                     dtype=torch.int32,
                     device='cuda')
-    ]  # ping-pong buffers
+    ]  # ping-pong buffers #@#性能
 
     ctx_buffer = {
         'input_ids': ctx_ids,
