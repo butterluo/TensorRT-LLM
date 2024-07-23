@@ -32,9 +32,6 @@ void Llama::initBuf() {
   size_t qkvOutSz = mArg._max_batch_tokens * mArg.qkvSz * sizeof(__nv_bfloat16);
   size_t ttlBytSz = (embTblSz + qkvOutSz);
   tensorrt_llm::common::check_cuda_error(cudaMalloc((void **)&_buf, ttlBytSz));
-  //for test
-  tensorrt_llm::common::check_cuda_error(cudaMalloc((void **)&_buf2, qkvOutSz));
-  tensorrt_llm::common::check_cuda_error(cudaMemset(_buf2, 0, qkvOutSz));
 
   size_t qkvWS = _qkvPrjPtr->getWorkspaceSize();
   size_t wsBytSz = qkvWS;
@@ -68,10 +65,10 @@ void Llama::Forward(const int *input_ptr, int *out_ptr) {
   _param.lookupParam.input_ids = const_cast<int*>(input_ptr);
   _param.lookupParam.outputs = _buf;
   _lookupPlugin.enqueue(_param.lookupParam, _stream);
-  // __nv_bfloat16* nxtMidPtr = reinterpret_cast<__nv_bfloat16*>(_param.lookupParam.outputs);
-  // nxtMidPtr = nxtMidPtr + _param.lookupParam.tokenNum * mArg.hidSz;
+  __nv_bfloat16* nxtMidPtr = reinterpret_cast<__nv_bfloat16*>(_param.lookupParam.outputs);
+  nxtMidPtr = nxtMidPtr + _param.lookupParam.tokenNum * mArg.hidSz;
   _qkvPrjPtr->enqueue(_param.lookupParam.tokenNum/*rowA*/, mArg.hidSz/*colA*/, mArg.qkvSz/*rowB*/, mArg.hidSz/*colB*/,
-             _param.lookupParam.outputs/*A*/, _qkvPrj_w_ptr/*B*/, _buf2/*C*/, _ws, _stream);
+             _param.lookupParam.outputs/*A*/, _qkvPrj_w_ptr/*B*/, nxtMidPtr/*C*/, _ws, _stream);
 }
 
 }

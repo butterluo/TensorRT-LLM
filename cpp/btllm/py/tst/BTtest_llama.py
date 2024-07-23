@@ -21,8 +21,8 @@ np.set_printoptions(
     threshold=np.inf,
     precision=3,
     suppress=True,
-    linewidth=64)
-
+    linewidth=640)
+import json
 import pytest
 import torch
 from parameterized import parameterized
@@ -271,11 +271,11 @@ def test_llama(use_refit, fast_building, context_fmha_flag,
     seed_idx = random.randint(0, len(PRECHECKED_GOOD_RANDOM_SEEDS) - 1)
     torch.manual_seed(PRECHECKED_GOOD_RANDOM_SEEDS[seed_idx])
     hf_llama = LlamaForCausalLM(llama_config).cuda()
-    runtime, _ = _gen_tensorrt_llm_runtime(
-        log_level, dtype, world_size, rank, llama_config, hf_llama, model,
-        use_plugin, batch_size, beam_width, input_len, output_len,
-        use_refit, fast_building, context_fmha_flag,
-        enable_remove_input_padding, **opt_flags)
+    # runtime, _ = _gen_tensorrt_llm_runtime(
+    #     log_level, dtype, world_size, rank, llama_config, hf_llama, model,
+    #     use_plugin, batch_size, beam_width, input_len, output_len,
+    #     use_refit, fast_building, context_fmha_flag,
+    #     enable_remove_input_padding, **opt_flags)
     key_value_cache_buffers = []
     head_size = llama_config.hidden_size // llama_config.num_attention_heads
     for i in range(llama_config.num_hidden_layers):
@@ -316,17 +316,20 @@ def test_llama(use_refit, fast_building, context_fmha_flag,
     print("-------------------compute ref hf lma---------------------")
     btref = hf_llama.model.embed_tokens(ctx_ids)
     btref = hf_llama.model.layers[0].input_layernorm(btref)
-    # query_states = hf_llama.model.layers[0].self_attn.q_proj(btref)
-    # key_states = hf_llama.model.layers[0].self_attn.k_proj(btref)
-    # value_states = hf_llama.model.layers[0].self_attn.v_proj(btref)
-    # btref = torch.cat([query_states, key_states, value_states], dim=-1)
+    query_states = hf_llama.model.layers[0].self_attn.q_proj(btref)
+    key_states = hf_llama.model.layers[0].self_attn.k_proj(btref)
+    value_states = hf_llama.model.layers[0].self_attn.v_proj(btref)
+    btref = torch.cat([query_states, key_states, value_states], dim=-1)
     btref = btref.clone().detach()
     btref_np = btref.to(torch.float32).cpu().numpy();
     print(btref_np)
     print("-------------------crate cpp lma----------")
     hf_llama.cpu()
     w = mrgeFfW(hf_llama)
-    jsnStr = llama_config.to_json_string(use_diff=False)
+    # jsnStr = llama_config.to_json_string(use_diff=False)
+    cfgDic = llama_config.to_dict()
+    cfgDic['other'] = 1
+    jsnStr = json.dumps(cfgDic)
     print(jsnStr)
     lma = createLlama(
             jsnStr,
@@ -340,7 +343,7 @@ def test_llama(use_refit, fast_building, context_fmha_flag,
     #         hf_llama.model.layers[0].self_attn.q_proj.weight.detach().to(torch.bfloat16),
     #         hf_llama.model.layers[0].self_attn.k_proj.weight.detach().to(torch.bfloat16),
     #         hf_llama.model.layers[0].self_attn.v_proj.weight.detach().to(torch.bfloat16)
-    #     ], dim=-1).transpose(0,1).contiguous()
+    #     ], dim=0)
     # np.testing.assert_allclose(cppw.to(torch.float32).cpu().numpy(), 
     #                            hfw.to(torch.float32).cpu().numpy(), 
     #                            rtol=1e-7, atol=0, verbose=True)
@@ -421,7 +424,7 @@ def mrgeFfW(hf:LlamaForCausalLM):
             hf.model.layers[i].self_attn.q_proj.weight.detach().to(torch.bfloat16),
             hf.model.layers[i].self_attn.k_proj.weight.detach().to(torch.bfloat16),
             hf.model.layers[i].self_attn.v_proj.weight.detach().to(torch.bfloat16)
-        ], dim=-1).transpose(0,1).contiguous()
+        ], dim=0)#.transpose(0,1).contiguous()
         cpyWeights(para, para_offset, 
             qkvw.to(torch.bfloat16), idx)
         idx+=1

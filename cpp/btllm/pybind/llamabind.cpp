@@ -69,18 +69,18 @@ torch::Tensor runLlama(std::shared_ptr<Llama> lma, const torch::Tensor &inpIdTsr
                      .device(inpIdTsr.device());
 
   //AFter emb and rms
-  torch::Tensor embOutTsr = torch::empty({batchSz, seqLen, hidSz}, outOpt).contiguous();
-  tensorrt_llm::common::check_cuda_error(cudaMemcpy(embOutTsr.data_ptr(), lma->_buf,
-                              size_t(batchSz*seqLen*hidSz * byteSzOfT)/* sizeof(bf16) */, cudaMemcpyDeviceToDevice/*cudaMemcpyDefault*/));
-  return embOutTsr;
+  // torch::Tensor embOutTsr = torch::empty({batchSz, seqLen, hidSz}, outOpt).contiguous();
+  // tensorrt_llm::common::check_cuda_error(cudaMemcpy(embOutTsr.data_ptr(), lma->_buf,
+  //                             size_t(batchSz*seqLen*hidSz * byteSzOfT)/* sizeof(bf16) */, cudaMemcpyDeviceToDevice/*cudaMemcpyDefault*/));
+  // return embOutTsr;
 
   //AFter qkvPrj
-  // torch::Tensor tsr = torch::empty({batchSz,seqLen,lma->mArg.qkvSz}, outOpt).contiguous();
-  // __nv_bfloat16* ptr = reinterpret_cast<__nv_bfloat16*>(lma->_buf2);
-  // // ptr = ptr + (batchSz*seqLen*hidSz);
-  // tensorrt_llm::common::check_cuda_error(cudaMemcpy(tsr.data_ptr(), ptr,
-  //                             size_t(batchSz*seqLen*lma->mArg.qkvSz * byteSzOfT), cudaMemcpyDeviceToDevice/*cudaMemcpyDefault*/));
-  // return tsr;
+  torch::Tensor tsr = torch::empty({batchSz,seqLen,lma->mArg.qkvSz}, outOpt).contiguous();
+  __nv_bfloat16* ptr = reinterpret_cast<__nv_bfloat16*>(lma->_buf);
+  ptr = ptr + (batchSz*seqLen*hidSz);
+  tensorrt_llm::common::check_cuda_error(cudaMemcpy(tsr.data_ptr(), ptr,
+                              size_t(batchSz*seqLen*lma->mArg.qkvSz * byteSzOfT), cudaMemcpyDeviceToDevice/*cudaMemcpyDefault*/));
+  return tsr;
 }
 
 

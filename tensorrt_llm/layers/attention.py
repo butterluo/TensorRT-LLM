@@ -687,61 +687,61 @@ class Attention(Module):
                 rope_scaling_factors = None
             mscale = self.mscale if self.position_embedding_type == PositionEmbeddingType.long_rope else None
             context, past_key_value = gpt_attention(#@#lma qwn
-                qkv=qkv,
-                past_key_value=past_key_value,
-                sequence_length=attention_params.sequence_length,
+                qkv=qkv,                          #as input @@
+                past_key_value=past_key_value,    #as input @@use_cache
+                sequence_length=attention_params.sequence_length,    #as input @@use_cache
                 host_past_key_value_lengths=kv_cache_params.
-                host_past_key_value_lengths,
+                    host_past_key_value_lengths,                     #as input @@
                 host_max_attention_window_sizes=kv_cache_params.
-                host_max_attention_window_sizes,
-                host_sink_token_length=kv_cache_params.host_sink_token_length,
-                context_lengths=attention_params.context_lengths,
-                cache_indirection=kv_cache_params.cache_indirection,
-                host_request_types=attention_params.host_request_types,
-                layer_idx=self.layer_idx,
+                    host_max_attention_window_sizes,                 #as input @@
+                host_sink_token_length=kv_cache_params.host_sink_token_length,       #as input @@
+                context_lengths=attention_params.context_lengths,         #as input @@
+                cache_indirection=kv_cache_params.cache_indirection,      #as input @@
+                host_request_types=attention_params.host_request_types,   #as input @@
+                layer_idx=self.layer_idx,                                 #$ in cpp
                 num_heads=self.num_attention_heads,
                 num_kv_heads=self.num_attention_kv_heads,
                 hidden_size_per_head=self.attention_head_size,
-                q_scaling=self.q_scaling,
-                rotary_embedding_dim=self.rotary_embedding_dim,
-                rotary_embedding_base=self.rotary_embedding_base,
-                rotary_embedding_scale_type=self.rotary_embedding_scale_type,
-                rotary_embedding_scaling_factors=rope_scaling_factors,
-                rotary_embedding_m_scale=mscale,
-                rotary_embedding_scale=self.rotary_embedding_scale,
+                q_scaling=self.q_scaling,  #@#lma default 1
+                rotary_embedding_dim=self.rotary_embedding_dim, #@#lma headSz*rotary_embedding_percentage(default=1)
+                rotary_embedding_base=self.rotary_embedding_base,   #dfault 10000
+                rotary_embedding_scale_type=self.rotary_embedding_scale_type, #default None
+                rotary_embedding_scaling_factors=rope_scaling_factors,          #as input
+                rotary_embedding_m_scale=mscale, #None, seems useless, can set to 0
+                rotary_embedding_scale=self.rotary_embedding_scale, #default 1
                 rotary_embedding_max_positions=self.max_position_embeddings,
-                position_embedding_type=self.position_embedding_type,
-                rotary_cos_sin=rotary_cos_sin,
-                kv_orig_quant_scale=kv_orig_quant_scale,
-                kv_quant_orig_scale=kv_quant_orig_scale,
-                attention_output_orig_quant_scale=
-                attention_output_orig_quant_scale,
-                kv_cache_quant_mode=self.quant_mode,
-                max_context_length=attention_params.max_context_length,
-                mask_type=self.attention_mask_type,
-                alibi_slopes=alibi_slopes,
+                position_embedding_type=self.position_embedding_type,#@#lma rope_gpt_neox
+                rotary_cos_sin=rotary_cos_sin,                                  #as input @@
+                kv_orig_quant_scale=kv_orig_quant_scale,                        #as input
+                kv_quant_orig_scale=kv_quant_orig_scale,                        #as input
+                attention_output_orig_quant_scale=                        
+                    attention_output_orig_quant_scale,                          #as input
+                kv_cache_quant_mode=self.quant_mode,#default QuantMode(0)
+                max_context_length=attention_params.max_context_length,  #@#??? check 'tensorrt_llm_llama.prepare_inputs('
+                mask_type=self.attention_mask_type,#@#lma set in llama/model.py as AttentionMaskType.causal
+                alibi_slopes=alibi_slopes,                                      #as input
                 tp_size=self.tp_size,
                 tp_rank=self.tp_rank,
                 kv_cache_block_offsets=kv_cache_params.kv_cache_block_offsets
-                if not self.cross_attention else
-                kv_cache_params.cross_kv_cache_block_offsets,
+                    if not self.cross_attention else
+                    kv_cache_params.cross_kv_cache_block_offsets,               #as input
                 host_kv_cache_block_offsets=kv_cache_params.
-                host_kv_cache_block_offsets if not self.cross_attention else
-                kv_cache_params.host_cross_kv_cache_block_offsets,
+                    host_kv_cache_block_offsets if not self.cross_attention else
+                    kv_cache_params.host_cross_kv_cache_block_offsets,           #as input
                 host_kv_cache_pool_pointers=kv_cache_params.
-                host_kv_cache_pool_pointers if not self.cross_attention else
-                kv_cache_params.host_cross_kv_cache_pool_pointers,
+                    host_kv_cache_pool_pointers if not self.cross_attention else
+                    kv_cache_params.host_cross_kv_cache_pool_pointers,           #as input
                 do_cross_attention=self.cross_attention,
-                cross_qkv=cross_qkv,
-                cross_qkv_length=attention_params.encoder_max_input_length,
-                encoder_input_lengths=attention_params.encoder_input_lengths,
+                cross_qkv=cross_qkv,                                             #as input
+                cross_qkv_length=attention_params.encoder_max_input_length,      #as input
+                encoder_input_lengths=attention_params.encoder_input_lengths,    #as input
                 relative_attention_bias=self.rel_attn_table.value
-                if self.relative_attention else None,
-                max_distance=self.max_distance,
-                host_context_lengths=attention_params.host_context_lengths,
-                use_cache=use_cache,
-                spec_decoding_position_offsets=spec_decoding_position_offsets,
-                spec_decoding_packed_mask=spec_decoding_packed_mask,
+                    if self.relative_attention else None,                        #as input
+                max_distance=self.max_distance,  #@#??? check 'tensorrt_llm_llama.prepare_inputs('
+                host_context_lengths=attention_params.host_context_lengths,      #as input @@ rm_pad
+                use_cache=use_cache,  #set in test.py 'tensorrt_llm_llama.prepare_inputs('
+                spec_decoding_position_offsets=spec_decoding_position_offsets,   #as input
+                spec_decoding_packed_mask=spec_decoding_packed_mask,             #as input
             )
 
         else:
