@@ -17,6 +17,12 @@ from itertools import product
 from pathlib import Path
 
 import numpy as np
+np.set_printoptions(
+    threshold=np.inf,
+    precision=3,
+    suppress=True,
+    linewidth=64)
+
 import pytest
 import torch
 from parameterized import parameterized
@@ -307,27 +313,57 @@ def test_llama(use_refit, fast_building, context_fmha_flag,
     torch.cuda.synchronize()
     ref = hf_outputs.logits[:, -1, :]
     ###################### Remove origin and Add below
-    w = mrgeFfW(hf_llama).cuda()
+    print("-------------------compute ref hf lma---------------------")
     btref = hf_llama.model.embed_tokens(ctx_ids)
     btref = hf_llama.model.layers[0].input_layernorm(btref)
+    # query_states = hf_llama.model.layers[0].self_attn.q_proj(btref)
+    # key_states = hf_llama.model.layers[0].self_attn.k_proj(btref)
+    # value_states = hf_llama.model.layers[0].self_attn.v_proj(btref)
+    # btref = torch.cat([query_states, key_states, value_states], dim=-1)
     btref = btref.clone().detach()
-    print("-----------------------------btref")
-    print(btref)
+    btref_np = btref.to(torch.float32).cpu().numpy();
+    print(btref_np)
+    print("-------------------crate cpp lma----------")
+    hf_llama.cpu()
+    w = mrgeFfW(hf_llama)
     jsnStr = llama_config.to_json_string(use_diff=False)
     print(jsnStr)
     lma = createLlama(
             jsnStr,
             256, #batch_size * llama_config.max_position_embeddings,  can be assign a different val manually
-            w
+            w.cuda()
             )
-
+    # print("----------compare w--------------")
+    # cppw = getLlamaW(lma)
+    # hfw = hf_llama.model.layers[0].input_layernorm.weight.detach().to(torch.bfloat16)
+    # hfw = torch.cat([
+    #         hf_llama.model.layers[0].self_attn.q_proj.weight.detach().to(torch.bfloat16),
+    #         hf_llama.model.layers[0].self_attn.k_proj.weight.detach().to(torch.bfloat16),
+    #         hf_llama.model.layers[0].self_attn.v_proj.weight.detach().to(torch.bfloat16)
+    #     ], dim=-1).transpose(0,1).contiguous()
+    # np.testing.assert_allclose(cppw.to(torch.float32).cpu().numpy(), 
+    #                            hfw.to(torch.float32).cpu().numpy(), 
+    #                            rtol=1e-7, atol=0, verbose=True)
+    print("-------------------RUN cpp lma----------")
     btres = runLlama(lma, ctx_ids, output_len)
-    print("-----------------------------btres")
-    print(btres)
-    np.testing.assert_allclose(btref.to(torch.float32).cpu().numpy(),
-                                   btres.to(torch.float32).cpu().numpy(),
-                                   atol=0.12,verbose=True)
+    # btres = btres.permute(2, 1,0).contiguous()
+    btres_np = btres.to(torch.float32).cpu().numpy()
+    print(btres_np)
+    
+    print("--------------manual compare--------------------")
+    rtol = 1e-7  # Set your relative tolerance
+    atol = 0.12  # Set your absolute tolerance (optional)
+
+    # Calculate the absolute difference between elements
+    difference = np.abs(btref_np - btres_np)
+
+    # Find indices where the difference is greater than tolerance
+    mismatch_indices = np.where(difference > (atol + rtol * np.abs(btres_np)))
+    print("----Mismatch indices:  \n", mismatch_indices)
+    print("-----------numpy compare------------")
+    np.testing.assert_allclose(btref_np, btres_np, rtol=rtol, atol=atol,verbose=True)
     print("---------DONE----------")
+
 
 def calc_offset(sizes):
     offsets = [int(0)]
@@ -374,41 +410,41 @@ def mrgeFfW(hf:LlamaForCausalLM):
 
     idx = 0
     cpyWeights(para, para_offset, 
-               hf.model.embed_tokens.weight.to(torch.bfloat16), idx)
+               hf.model.embed_tokens.weight.detach().to(torch.bfloat16), idx)
     idx+=1
     for i in range(cfg.num_hidden_layers):
         cpyWeights(para, para_offset, 
-            hf.model.layers[i].input_layernorm.weight.to(torch.bfloat16), idx)
+            hf.model.layers[i].input_layernorm.weight.detach().to(torch.bfloat16), idx)
         idx+=1
         #@# assume attn_implementation is eager
         qkvw = torch.cat([
-            hf.model.layers[i].self_attn.q_proj.weight.to(torch.bfloat16),
-            hf.model.layers[i].self_attn.k_proj.weight.to(torch.bfloat16),
-            hf.model.layers[i].self_attn.v_proj.weight.to(torch.bfloat16)
-        ], dim=0)
+            hf.model.layers[i].self_attn.q_proj.weight.detach().to(torch.bfloat16),
+            hf.model.layers[i].self_attn.k_proj.weight.detach().to(torch.bfloat16),
+            hf.model.layers[i].self_attn.v_proj.weight.detach().to(torch.bfloat16)
+        ], dim=-1).transpose(0,1).contiguous()
         cpyWeights(para, para_offset, 
             qkvw.to(torch.bfloat16), idx)
         idx+=1
         cpyWeights(para, para_offset, 
-            hf.model.layers[i].self_attn.o_proj.weight.to(torch.bfloat16), idx)
+            hf.model.layers[i].self_attn.o_proj.weight.detach().to(torch.bfloat16), idx)
         idx+=1
         cpyWeights(para, para_offset, 
-            hf.model.layers[i].post_attention_layernorm.weight.to(torch.bfloat16), idx)
+            hf.model.layers[i].post_attention_layernorm.weight.detach().to(torch.bfloat16), idx)
         idx+=1
         cpyWeights(para, para_offset, 
-            hf.model.layers[i].mlp.up_proj.weight.to(torch.bfloat16), idx)
+            hf.model.layers[i].mlp.up_proj.weight.detach().to(torch.bfloat16), idx)
         idx+=1
         cpyWeights(para, para_offset, 
-            hf.model.layers[i].mlp.gate_proj.weight.to(torch.bfloat16), idx)
+            hf.model.layers[i].mlp.gate_proj.weight.detach().to(torch.bfloat16), idx)
         idx+=1
         cpyWeights(para, para_offset, 
-            hf.model.layers[i].mlp.down_proj.weight.to(torch.bfloat16), idx)
+            hf.model.layers[i].mlp.down_proj.weight.detach().to(torch.bfloat16), idx)
         idx+=1
     cpyWeights(para, para_offset, 
-            hf.model.norm.weight.to(torch.bfloat16), idx)
+            hf.model.norm.weight.detach().to(torch.bfloat16), idx)
     idx+=1
     cpyWeights(para, para_offset, 
-            hf.lm_head.weight.to(torch.bfloat16), idx)
+            hf.lm_head.weight.detach().to(torch.bfloat16), idx)
     idx+=1
     assert(idx == len(sizes))
     return para

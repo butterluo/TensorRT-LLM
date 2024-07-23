@@ -386,7 +386,7 @@ class _Runtime(object):
             stream = torch.cuda.current_stream().cuda_stream
         elif isinstance(stream, torch.cuda.Stream):
             stream = stream.cuda_stream
-        ok = context.execute_async_v3(stream)
+        ok = context.execute_async_v3(stream) #@#TODO
         return ok
 
     def __del__(self):

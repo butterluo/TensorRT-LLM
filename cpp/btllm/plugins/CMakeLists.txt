@@ -33,7 +33,7 @@ set(PLUGIN_LISTS
     # gptAttentionCommon
     # gptAttentionPlugin
     # identityPlugin
-    # gemmPlugin
+    gemmPlugin
     # smoothQuantGemmPlugin
     # quantizePerTokenPlugin
     # quantizeTensorPlugin

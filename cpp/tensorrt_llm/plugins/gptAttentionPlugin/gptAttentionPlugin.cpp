@@ -411,7 +411,7 @@ int GPTAttentionPlugin::enqueueImpl(nvinfer1::PluginTensorDesc const* inputDesc,
     }
 
     // mixed requests require mRemovePadding and mPagedKVCache 
-    if (nbContextRequests != 0 && nbContextRequests != nbSeq)//@#??? 只用mRemovePadding不行么
+    if (nbContextRequests != 0 && nbContextRequests != nbSeq)//@#??? 只用mRemovePadding不行么?为何一定要一起用?'nbContextRequests != nbSeq'又是啥意思
     {
         TLLM_CHECK(mRemovePadding && mPagedKVCache);
     }

@@ -4,8 +4,11 @@
 
 #include "btllm/btcommon/bt.h"
 #include "btllm/plugins/lookupPlugin/lookupPlugin.h"
+#include "btllm/plugins/gemmPlugin/gemmPlugin.h"
 
 using btllm::plugins::LookupPlugin;
+using btllm::plugins::GemmPluginCreator;
+using btllm::plugins::GemmPlugin;
 
 namespace btllm {
 namespace mdl {
@@ -18,6 +21,10 @@ public:
 struct BTArg: BTBaseArg { //for init
   int vocabSz;
   int hidSz;
+  int headSz;
+  int qkvSz;
+  int qHead;
+  int kvHead;
   size_t _max_batch_tokens;
 };
 
@@ -50,16 +57,21 @@ void Forward(const int *input_ptr, int *out_ptr);
 
 
 void* _buf = nullptr;
+void* _buf2 = nullptr;
 
-private:
+// private:
 
 Json _jsn;
 BTParam _param;
 cudaStream_t _stream = NULL;
 LookupPlugin _lookupPlugin;
+btllm::plugins::GemmPlugin* _qkvPrjPtr;
 
 __nv_bfloat16* _emb_w_ptr = nullptr;
 __nv_bfloat16* _prerms_w_ptr = nullptr;
+__nv_bfloat16* _qkvPrj_w_ptr = nullptr;
+
+void* _ws = nullptr;
 };
 
 }

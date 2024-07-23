@@ -49,12 +49,12 @@ class GPTBenchmark(BaseBenchmark):
                          world_size, args.serial_build)
         self.batch_sizes = batch_sizes
         self.in_out_lens = in_out_lens
-        self.gpu_weights_percents = gpu_weights_percents
+        self.gpu_weights_percents = gpu_weights_percents #@#TODO
         self.num_beams = args.num_beams
         self.mode = args.mode
         self.build_time = 0
 
-        self.cuda_graph_mode = args.enable_cuda_graph
+        self.cuda_graph_mode = args.enable_cuda_graph #@#TODO
         self.build_config = None
         # this dtype may be modified based on quantization mode later, when the fp8/int8 kv cache is used
         self.kv_dtype = args.dtype
@@ -62,14 +62,14 @@ class GPTBenchmark(BaseBenchmark):
         # approximate the weights size in the engine by using engine size
         # the actual weights size shall be smaller because there are some other data in the engine file.
         # for large model, this approximate is close enough.
-        self.weights_size_approx = 0
+        self.weights_size_approx = 0 #@#TODO
 
         self.dump_layer_info = args.dump_layer_info
         # change profiling_verbosity to detailed when enabling dump layer info
         if self.dump_layer_info:
             args.profiling_verbosity = "detailed"
 
-        if args.engine_dir is not None:
+        if args.engine_dir is not None: #@#TODO
             # Get build configs from engine directory is done in base class
             # Deserialize engine from engine directory
             self.serialize_path = os.path.join(args.engine_dir,

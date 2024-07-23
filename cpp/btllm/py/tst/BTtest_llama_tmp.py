@@ -236,7 +236,7 @@ def test_llama( use_refit, fast_building, context_fmha_flag,
     use_plugin = True  # gpt plugin
     batch_size = 4
     beam_width = 1
-    input_len = 4
+    input_len = 5
     output_len = 2
     max_seq_len = input_len + output_len
     world_size = 1
@@ -400,7 +400,7 @@ def test_llama( use_refit, fast_building, context_fmha_flag,
         'context_lengths': gen_context_lengths,
         'position_ids': gen_position_ids,
         'last_token_ids': gen_last_token_ids,
-        'host_request_types': gen_host_request_types,
+        'host_request_types': gen_host_request_types,  #@#lma 这里标注是ctx prefill阶段还是generate(decd)阶段,1是generate阶段，0是ctx prefill阶段
         'cache_indirection': cache_indirections[1],
     }
     if enable_remove_input_padding:

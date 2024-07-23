@@ -29,6 +29,24 @@ std::shared_ptr<Llama> createLlama(const std::string& jsn, size_t max_batch_toke
   return std::shared_ptr<Llama>(obj);
 }
 
+torch::Tensor getLlamaW(std::shared_ptr<Llama> lma) {
+    auto outOpt = torch::TensorOptions()
+                     .dtype(torch::kBFloat16)
+                     .layout(torch::kStrided)
+                     .device("cuda:0");
+    // //pre rms norm weight
+    // torch::Tensor tsr = torch::empty({lma->mArg.hidSz}, outOpt).contiguous();
+    // tensorrt_llm::common::check_cuda_error(cudaMemcpy(tsr.data_ptr(), (void*)lma->_prerms_w_ptr, 
+    //       size_t(lma->mArg.hidSz * sizeof(__nv_bfloat16)), cudaMemcpyDeviceToDevice));
+    // return tsr;
+
+    //qkv 0 weight
+    torch::Tensor tsr = torch::empty({lma->mArg.qkvSz, lma->mArg.hidSz}, outOpt).contiguous();
+    tensorrt_llm::common::check_cuda_error(cudaMemcpy(tsr.data_ptr(), (void*)lma->_qkvPrj_w_ptr, 
+          size_t(lma->mArg.qkvSz*lma->mArg.hidSz * sizeof(__nv_bfloat16)), cudaMemcpyDeviceToDevice));
+    return tsr;
+}
+
 torch::Tensor runLlama(std::shared_ptr<Llama> lma, const torch::Tensor &inpIdTsr, int mxOutputLen) {
   auto options = torch::TensorOptions()
                      .dtype(torch::kInt32)
@@ -44,16 +62,25 @@ torch::Tensor runLlama(std::shared_ptr<Llama> lma, const torch::Tensor &inpIdTsr
   torch::Tensor output = torch::empty({mxOutputLen}, options).contiguous();
   lma->Forward(reinterpret_cast<int*>(inpIdTsr.data_ptr()), reinterpret_cast<int*>(output.data_ptr()));
   // tensorrt_llm::common::check_cuda_error(cudaGetLastError());
-  
-  auto embOutOpt = torch::TensorOptions()
+  size_t byteSzOfT = sizeof(__nv_bfloat16);
+  auto outOpt = torch::TensorOptions()
                      .dtype(torch::kBFloat16)
                      .layout(torch::kStrided)
                      .device(inpIdTsr.device());
-  torch::Tensor embOutTsr = torch::empty({batchSz, seqLen, hidSz}, embOutOpt).contiguous();
+
+  //AFter emb and rms
+  torch::Tensor embOutTsr = torch::empty({batchSz, seqLen, hidSz}, outOpt).contiguous();
   tensorrt_llm::common::check_cuda_error(cudaMemcpy(embOutTsr.data_ptr(), lma->_buf,
-                              size_t(batchSz*seqLen*hidSz * 2)/* sizeof(bf16) */, cudaMemcpyDeviceToDevice/*cudaMemcpyDefault*/));
-  
+                              size_t(batchSz*seqLen*hidSz * byteSzOfT)/* sizeof(bf16) */, cudaMemcpyDeviceToDevice/*cudaMemcpyDefault*/));
   return embOutTsr;
+
+  //AFter qkvPrj
+  // torch::Tensor tsr = torch::empty({batchSz,seqLen,lma->mArg.qkvSz}, outOpt).contiguous();
+  // __nv_bfloat16* ptr = reinterpret_cast<__nv_bfloat16*>(lma->_buf2);
+  // // ptr = ptr + (batchSz*seqLen*hidSz);
+  // tensorrt_llm::common::check_cuda_error(cudaMemcpy(tsr.data_ptr(), ptr,
+  //                             size_t(batchSz*seqLen*lma->mArg.qkvSz * byteSzOfT), cudaMemcpyDeviceToDevice/*cudaMemcpyDefault*/));
+  // return tsr;
 }
 
 
@@ -64,10 +91,7 @@ PYBIND11_MODULE(BTLLM_PYBIND_MODULE, m)
         // .def(py::init<nvinfer1::DataType, int, int, void*>())
         // .def("setName", &Pet::setName)
         ;
-  m.def("createLlama",
-        &createLlama,
-        "BT createLlama");
-  m.def("runLlama",
-        &runLlama,
-        "BT runLlama");
+  m.def("createLlama", &createLlama, "BT createLlama");
+  m.def("runLlama", &runLlama, "BT runLlama");
+  m.def("getLlamaW", &getLlamaW, "BT getLlamaW");
 }

@@ -434,7 +434,7 @@ def build_gpt(args):
             build_config["moe_top_k"],
         }
         config = PretrainedConfig.from_dict(config)
-        tensorrt_llm_model = tensorrt_llm.models.LLaMAForCausalLM(config)
+        tensorrt_llm_model = tensorrt_llm.models.LLaMAForCausalLM(config) #@#此时会随机初始化权重???
         tensorrt_llm_model = optimize_model(tensorrt_llm_model,
                                             use_fused_mlp=True)
     elif family == "gptj":
@@ -952,7 +952,7 @@ def build_gpt(args):
         tensorrt_llm_model(**inputs)
 
     if args.mode in ['plugin', 'plugin-ifb']:
-        tensorrt_llm.graph_rewriting.optimize(network)
+        tensorrt_llm.graph_rewriting.optimize(network) #@#TODO
 
     # Network -> Engine
     start = time.time()

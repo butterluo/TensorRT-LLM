@@ -16,7 +16,7 @@
  */
 
 #include "btllm/plugins/common/gemmPluginProfiler.h"
-// #include "tensorrt_llm/common/cublasMMWrapper.h"
+#include "tensorrt_llm/common/cublasMMWrapper.h"
 #include "tensorrt_llm/common/cudaUtils.h"
 #include "btllm/kernels/cutlass_kernels/btfpA_intB_gemm/btfpA_intB_gemm.h"
 // #include "tensorrt_llm/kernels/cutlass_kernels/int8_gemm/int8_gemm.h"
@@ -287,8 +287,8 @@ template class GemmPluginProfiler<tensorrt_llm::cutlass_extensions::CutlassGemmC
     std::shared_ptr<btllm::kernels::cutlass_kernels::BTCutlassFpAIntBGemmRunnerInterface>, GemmIdCore,
     GemmIdCoreHash>;
 
-// template class GemmPluginProfiler<cublasLtMatmulHeuristicResult_t,
-//     std::shared_ptr<tensorrt_llm::tensorrt_llm::common::CublasMMWrapper>, GemmIdCublas, GemmIdCublasHash>;
+template class GemmPluginProfiler<cublasLtMatmulHeuristicResult_t,
+    std::shared_ptr<tensorrt_llm::common::CublasMMWrapper>, GemmIdCublas, GemmIdCublasHash>;
 
 // // TODO I dont like the dependency on the MOE plugin here, but MOE needs the full context to run profiles
 // template class GemmPluginProfiler<tensorrt_llm::cutlass_extensions::CutlassGemmConfig, MixtureOfExpertsPlugin*,
