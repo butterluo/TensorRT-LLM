@@ -111,10 +111,10 @@ void GPTAttentionPlugin::initEntryIdx()
     for (int i = 0; i < static_cast<size_t>(IdxEntry::ENUM_SIZE); i++)
     {
         mEntryIdx[i] = entryIdx;
-        entryIdx += isEntryUsed(static_cast<IdxEntry>(i));//???
+        entryIdx += isEntryUsed(static_cast<IdxEntry>(i));//@# 若该场景下没用到该input field，则entryIdx会跳过+1。比如CACHE_INDIR的entryIdx之所以是6而不是8，是因为在fuse qkv场景下没用到它前面的K_TENSOR，V_TENSOR两个input field，所以它的entryIdx跳过了两次+1，即8-2=6
     }
 }
-
+/* getIdx 返回对应input field在initEntryIdx()中的设置的entryIdx */
 GPTAttentionPlugin::IndexType GPTAttentionPlugin::getIdx(IdxEntry const& entry) const
 {
     TLLM_CHECK_WITH_INFO(
@@ -256,16 +256,16 @@ void GPTAttentionPlugin::configurePluginImpl(nvinfer1::DynamicPluginTensorDesc c
     nvinfer1::DynamicPluginTensorDesc const* out, int nbOutputs) noexcept
 {//@#lma init/...11.1.1
     TLLM_CHECK(mHeadSize > 0);
-
+//cache_indirection(即CACHE_INDIR)的tensor元数据的设置路径是BTtest_llama_tmp.py.'tensorrt_llm_llama.prepare_inputs('>modeling_utils.py.prepare_inputs()>generation_mixin.py.prepare_basic_inputs()>prepare_attention_inputs()中的'cache_indirection = Tensor(‘语句
     int const beamWidth
-        = isCrossAttention() ? 1 : (useKVCache() ? in[getIdx(IdxEntry::CACHE_INDIR)].desc.dims.d[1] : 1);
+        = isCrossAttention() ? 1 : (useKVCache() ? in[getIdx(IdxEntry::CACHE_INDIR)].desc.dims.d[1] : 1);/* getIdx 返回对应input field在initEntryIdx()中的设置的entryIdx */
     // Commonly, cyclic_attention_window_size, and max_attention_window_size will be the same
     // unless each layer has different attention window sizes.
     // the kv_cache capacity.
     int max_encoder_context_len = isCrossAttention() ? in[getIdx(IdxEntry::CROSS_QKV_LENGTH)].desc.dims.d[0] : 0;
     int const max_attention_window_size = isCrossAttention()
         ? max_encoder_context_len
-        : (useKVCache() ? in[getIdx(IdxEntry::CACHE_INDIR)].desc.dims.d[2] : 0);
+        : (useKVCache() ? in[getIdx(IdxEntry::CACHE_INDIR)].desc.dims.d[2] : 0);//cache_indirection()
     int const cyclic_attention_window_size = max_attention_window_size;
 
     int const num_requests = 256;

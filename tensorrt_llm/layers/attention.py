@@ -717,7 +717,7 @@ class Attention(Module):
                 attention_output_orig_quant_scale=                        
                     attention_output_orig_quant_scale,                          #as input
                 kv_cache_quant_mode=self.quant_mode,#default QuantMode(0)
-                max_context_length=attention_params.max_context_length,  #@#??? check 'tensorrt_llm_llama.prepare_inputs('
+                max_context_length=attention_params.max_context_length,  #@# set by  'tensorrt_llm_llama.prepare_inputs( max_input_len=...', refer to modeling_util.py.prepare_inputs()
                 mask_type=self.attention_mask_type,#@#lma set in llama/model.py as AttentionMaskType.causal
                 alibi_slopes=alibi_slopes,                                      #as input
                 tp_size=self.tp_size,

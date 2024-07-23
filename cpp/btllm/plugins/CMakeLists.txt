@@ -31,7 +31,7 @@ set(PLUGIN_CU_SOURCES)
 set(PLUGIN_LISTS
     # bertAttentionPlugin
     # gptAttentionCommon
-    # gptAttentionPlugin
+    gptAttentionPlugin
     # identityPlugin
     gemmPlugin
     # smoothQuantGemmPlugin

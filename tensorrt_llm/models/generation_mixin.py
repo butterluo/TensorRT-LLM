@@ -287,7 +287,7 @@ class GenerationMixin:
                 dim_range=OrderedDict([
                     ('batch_size_cache', bs_range),
                     ('beam_width', beam_width_range),
-                    ('max_seq_len', max_len_range),
+                    ('max_seq_len', max_len_range),#max_input_len + max_output_len
                 ]),
             )
 
