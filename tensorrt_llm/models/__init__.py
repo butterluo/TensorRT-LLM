@@ -26,6 +26,7 @@ from .gpt.model import GPTForCausalLM, GPTModel
 from .gptj.model import GPTJForCausalLM, GPTJModel
 from .gptneox.model import GPTNeoXForCausalLM, GPTNeoXModel
 from .llama.model import LLaMAForCausalLM, LLaMAModel
+from .llamaLL.model import LLaMALLForCausalLM, LLaMALLModel #@#
 from .mamba.model import MambaForCausalLM
 from .medusa.model import MedusaForCausalLm
 from .modeling_utils import (PretrainedConfig, PretrainedModel,
@@ -51,6 +52,8 @@ __all__ = [
     'OPTModel',
     'LLaMAForCausalLM',
     'LLaMAModel',
+    'LLaMALLForCausalLM',
+    'LLaMALLModel',
     'MedusaForCausalLm',
     'GPTJModel',
     'GPTJForCausalLM',
@@ -93,6 +96,7 @@ MODEL_MAP = {
     'MPTForCausalLM': MPTForCausalLM,
     'ChatGLMForCausalLM': ChatGLMForCausalLM,
     'LlamaForCausalLM': LLaMAForCausalLM,
+    'LlamaLLForCausalLM': LLaMALLForCausalLM,
     'MistralForCausalLM': LLaMAForCausalLM,
     'MixtralForCausalLM': LLaMAForCausalLM,
     'ArcticForCausalLM': LLaMAForCausalLM,
