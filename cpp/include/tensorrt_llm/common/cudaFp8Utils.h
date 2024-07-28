@@ -16,7 +16,7 @@
 
 #pragma once
 
-#ifdef ENABLE_FP8
+// #ifdef ENABLE_FP8    //@#BUG some file still need cuda_fp8.h even though ENABLE_FP8=0
 #include <cuda_fp8.h>
 #include <cuda_runtime.h>
 #include <stdint.h>
@@ -236,4 +236,4 @@ void invokeComputeScalesAndQuantizeMatrix(T_OUT* output, T_S* quant_ptr, const T
 
 } // namespace common
 } // namespace tensorrt_llm
-#endif // ENABLE_FP8
+//#endif // ENABLE_FP8
