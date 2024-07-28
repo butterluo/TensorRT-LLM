@@ -39,25 +39,7 @@ def working_directory(path):
         os.chdir(prev_cwd)
 
 
-def get_project_dir():
-    return Path(__file__).parent.resolve().parent
-
-
-def get_source_dir():
-    return get_project_dir() / "cpp"
-
-
-def get_build_dir(build_dir, build_type):
-    if build_dir is None:
-        build_dir = get_source_dir() / ("build" if build_type == "Release" else
-                                        f"build_{build_type}")
-    else:
-        build_dir = Path(build_dir)
-    return build_dir
-
-
-def main(*,
-         build_type: str = "Release",
+def main(build_type: str = "Release",
          build_dir: Path = None,
          dist_dir: Path = None,
          cuda_architectures: str = None,
@@ -68,15 +50,13 @@ def main(*,
          nccl_root: str = None,
          clean: bool = False,
          use_ccache: bool = False,
-         fast_build: bool = False,
          cpp_only: bool = False,
          install: bool = False,
          skip_building_wheel: bool = False,
          python_bindings: bool = True,
          benchmarks: bool = False,
-         micro_benchmarks: bool = False,
          nvtx: bool = False):
-    project_dir = get_project_dir()
+    project_dir = Path(__file__).parent.resolve().parent
     os.chdir(project_dir)
     build_run = partial(run, shell=True, check=True)
 
@@ -84,7 +64,9 @@ def main(*,
     #     build_run('git submodule update --init --recursive')
     on_windows = platform.system() == "Windows"
     # requirements_filename = "requirements-dev-windows.txt" if on_windows else "requirements-dev.txt"
-    # build_run(f"\"{sys.executable}\" -m pip install -r {requirements_filename}") #@#MODIFY tmp comment this to avoid pip install tmp
+    # build_run(
+    #     f"\"{sys.executable}\" -m pip install -r {requirements_filename} --extra-index-url https://pypi.ngc.nvidia.com"
+    # ) #@#MODIFY tmp comment this to avoid pip install tmp
     # Ensure TRT is installed on windows to prevent surprises.
     reqs = check_output([sys.executable, "-m", "pip", "freeze"])
     installed_packages = [r.decode().split("==")[0] for r in reqs.split()]
@@ -148,7 +130,13 @@ def main(*,
         cmake_def_args.append(f"-DNCCL_LIB_DIR={nccl_root}/lib")
         cmake_def_args.append(f"-DNCCL_INCLUDE_DIR={nccl_root}/include")
 
-    build_dir = get_build_dir(build_dir, build_type)
+    source_dir = project_dir / "cpp"
+
+    if build_dir is None:
+        build_dir = source_dir / ("build" if build_type == "Release" else
+                                  f"build_{build_type}")
+    else:
+        build_dir = Path(build_dir)
     first_build = not build_dir.exists()
 
     if clean and build_dir.exists():
@@ -160,33 +148,27 @@ def main(*,
             f"-DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_CUDA_COMPILER_LAUNCHER=ccache"
         )
 
-    if fast_build:
-        cmake_def_args.append(f"-DFAST_BUILD=ON")
-
     build_pyt = "OFF" if cpp_only else "ON"
     th_common_lib = "" if cpp_only else "th_common"
     build_pybind = "OFF" if cpp_only else "ON"
     bindings_lib = "" if cpp_only else "bindings"
     benchmarks_lib = "benchmarks" if benchmarks else ""
-    build_micro_benchmarks = "ON" if micro_benchmarks else "OFF"
-    micro_benchmarks_lib = "micro_benchmarks" if micro_benchmarks else ""
     disable_nvtx = "OFF" if nvtx else "ON"
     executor_worker = "" if on_windows else "executorWorker "
 
-    source_dir = get_source_dir()
     with working_directory(build_dir):
         cmake_def_args = " ".join(cmake_def_args)
         if clean or first_build:
             build_run(
-                f'cmake -DCMAKE_BUILD_TYPE="{build_type}" -DBUILD_PYT="{build_pyt}" -DBUILD_PYBIND="{build_pybind}"'
-                f' -DNVTX_DISABLE="{disable_nvtx}" -DBUILD_MICRO_BENCHMARKS={build_micro_benchmarks}'
+                f'cmake -DCMAKE_BUILD_TYPE="{build_type}" -DBUILD_PYT="{build_pyt}" -DBUILD_PYBIND="{build_pybind}" -DNVTX_DISABLE="{disable_nvtx}"'
                 f' {cmake_cuda_architectures} {cmake_def_args} {cmake_generator} -S "{source_dir}"'
             )
         build_run(
             f'cmake --build . --config {build_type} --parallel {job_count} '
-            f'--target tensorrt_llm nvinfer_plugin_tensorrt_llm {th_common_lib} {bindings_lib} {benchmarks_lib} '
-            f'{micro_benchmarks_lib} {executor_worker} {" ".join(extra_make_targets)}'
-        )
+            # f'--target tensorrt_llm nvinfer_plugin_tensorrt_llm {th_common_lib} {bindings_lib} {benchmarks_lib} {executor_worker}'
+            #@#MODIFY change above to below, to build btllm
+            f'--target tensorrt_llm nvinfer_plugin_tensorrt_llm {th_common_lib} {bindings_lib} {benchmarks_lib} {executor_worker} btllm btllm_plugin btllm_mdl btpybind'
+            f'{" ".join(extra_make_targets)}')
 
     if cpp_only:
         assert not install, "Installing is not supported for cpp_only builds"
@@ -305,7 +287,8 @@ def main(*,
         build_run(f"\"{sys.executable}\" -m pip install -e .[devel]")
 
 
-def add_arguments(parser: ArgumentParser):
+if __name__ == "__main__":
+    parser = ArgumentParser()
     parser.add_argument("--build_type",
                         "-b",
                         default="Release",
@@ -318,14 +301,6 @@ def add_arguments(parser: ArgumentParser):
                         default=False,
                         action="store_true",
                         help="Use ccache compiler driver")
-    parser.add_argument(
-        "--fast_build",
-        "-f",
-        default=False,
-        action="store_true",
-        help=
-        "Skip compiling some kernels to accelerate compilation -- for development only"
-    )
     parser.add_argument("--job_count",
                         "-j",
                         const=cpu_count(),
@@ -372,26 +347,17 @@ def add_arguments(parser: ArgumentParser):
     parser.add_argument("--benchmarks",
                         action="store_true",
                         help="Build the benchmarks for the C++ runtime.")
-    parser.add_argument("--micro_benchmarks",
-                        action="store_true",
-                        help="Build the micro benchmarks for C++ components.")
     parser.add_argument("--nvtx",
                         action="store_true",
                         help="Enable NVTX features.")
-
-
-if __name__ == "__main__":
-    parser = ArgumentParser()
-    add_arguments(parser)
     args = parser.parse_args()
     main(**vars(args))
 """
 虽然rtx不支持FP8,但若ENABLE_FP8=0时依然有很多源码用到fp8,所以无法禁用. 但在cuda>12时ENABLE_BF16和ENABLE_FP8会自动启用,所以无需在命令行明确指出
 即使ENABLE_MULTI_DEVICE=0也会链接到mpi,所以无法禁用,要装mpi&nccl否则报错
 @# 
-python3 ./scripts/build_wheel.py --cuda_architectures "80-real;86-real" --trt_root /usr/local/tensorrt --skip_building_wheel --build_type Debug --install --use_ccache --fast_build --job_count 16 -D "ENABLE_MULTI_DEVICE=1" -D "NVTX_DISABLE=1" -D "BUILD_BENCHMARKS=0" -D "FAST_MATH=1" -D "CUTLASS_HOME=/home/SRC/MLSys/HPC/GPU/cutlass" -D "NVTX_HOME=/home/SRC/MLSys/HPC/GPU/NVTX" -D "JSON_HOME=/home/SRC/Lang/json" -D "CXXOPTS_HOME=/home/SRC/Lang/cxxopts" -D "GOOGLETEST_HOME=/home/SRC/Lang/googletest" -D "CMAKE_VERBOSE_MAKEFILE=ON" -D "CMAKE_EXPORT_COMPILE_COMMANDS:BOOL=TRUE" --clean
+python3 ./scripts/build_wheel.py --cuda_architectures "80-real;86-real" --trt_root /usr/local/tensorrt --skip_building_wheel --build_type Debug --install --use_ccache --job_count 16 -D "ENABLE_MULTI_DEVICE=1" -D "ENABLE_FP8=0" -D "NVTX_DISABLE=1" -D "BUILD_BENCHMARKS=0" -D "FAST_MATH=1" -D "CUTLASS_HOME=/home/SRC/MLSys/HPC/GPU/cutlass" -D "NVTX_HOME=/home/SRC/MLSys/HPC/GPU/NVTX" -D "JSON_HOME=/home/SRC/Lang/json" -D "CXXOPTS_HOME=/home/SRC/Lang/cxxopts" -D "GOOGLETEST_HOME=/home/SRC/Lang/googletest" -D "CMAKE_VERBOSE_MAKEFILE=ON" -D "CMAKE_EXPORT_COMPILE_COMMANDS:BOOL=TRUE" --clean
 
-rm -D "ENABLE_FP8=0"
 下面选项可看情况添加:
 --clean 
 --cpp_only  cpp_only在bild_wheel.py中的设置会造成很多问题,最好不加

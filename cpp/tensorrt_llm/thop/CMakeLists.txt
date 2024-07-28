@@ -18,12 +18,22 @@ set_property(TARGET th_utils PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 target_link_libraries(th_utils PUBLIC ${TORCH_LIBRARIES} ${CUBLAS_LIB}
                                       ${CURAND_LIB})
 
+# add_library(
+#   th_common SHARED
+#   dynamicDecodeOp.cpp
+#   weightOnlyQuantOp.cpp
+#   gatherTreeOp.cpp
+#   fp8Op.cpp
+#   ncclCommunicatorOp.cpp
+#   parallelDecodeKVCacheUpdateOp.cpp
+#  convertSpecDecodingMaskToPackedMaskOp.cpp
+#  relativeAttentionBiasOp.cpp)
+#@#MOdIFY change above into below. we don't use fp8
 add_library(
   th_common SHARED
   dynamicDecodeOp.cpp
   weightOnlyQuantOp.cpp
   gatherTreeOp.cpp
-  fp8Op.cpp
   ncclCommunicatorOp.cpp
   parallelDecodeKVCacheUpdateOp.cpp
   convertSpecDecodingMaskToPackedMaskOp.cpp

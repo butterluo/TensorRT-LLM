@@ -33,10 +33,16 @@ endif()
 find_library_create_target(nvonnxparser ${ONNX_PARSER_LIB_NAME} SHARED
                            ${TRT_OUT_DIR} ${TRT_LIB_DIR})
 
+# include_directories(
+#   ${PROJECT_SOURCE_DIR}/tensorrt_llm/cutlass_extensions/include
+#   ${PROJECT_SOURCE_DIR}/include ${3RDPARTY_DIR}/cutlass/include
+#   ${3RDPARTY_DIR}/cutlass/tools/util/include)
+#@# change above into below
 include_directories(
   ${PROJECT_SOURCE_DIR}/tensorrt_llm/cutlass_extensions/include
-  ${PROJECT_SOURCE_DIR}/include ${3RDPARTY_DIR}/cutlass/include
-  ${3RDPARTY_DIR}/cutlass/tools/util/include)
+  ${PROJECT_SOURCE_DIR}/include ${CUTLASS_HOME}/include
+  ${CUTLASS_HOME}/tools/util/include)
+
 
 set(TOP_LEVEL_DIR "${PROJECT_SOURCE_DIR}/..")
 

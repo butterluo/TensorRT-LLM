@@ -42,7 +42,7 @@ std::vector<nvinfer1::PluginField> WeightOnlyGroupwiseQuantMatmulPluginCreator::
 
 void WeightOnlyGroupwiseQuantGemmPluginProfiler::runTactic(int m, int n, int k,
     WeightOnlyGroupwiseQuantGemmPluginProfiler::Config const& tactic, char* workspace, cudaStream_t const& stream)
-{
+{//@# call from profileTacticForProblem()<profileTacticsForProblem()<profileTactics() of GemmPluginProfiler<Config, RunnerPtr, GemmIdType, GemmIdHashType>
     // Quantized weights are packed in FP16 format (INT4*4 -> FP16)
     int const originalN = n * FP16_INT4_RATIO;
     half* actPtr = reinterpret_cast<half*>(workspace);
@@ -75,7 +75,7 @@ void WeightOnlyGroupwiseQuantGemmPluginProfiler::runTactic(int m, int n, int k,
 }
 
 void WeightOnlyGroupwiseQuantGemmPluginProfiler::computeTmpSize(int maxM, int n, int k)
-{
+{//@#quant called from GemmPluginProfiler<Config, RunnerPtr, GemmIdType, GemmIdHashType>::profileTactics()
     // Quantized weights are packed in FP16 format (INT4*4 -> FP16)
     int const originalN = n * FP16_INT4_RATIO;
     std::vector<size_t> workspaces = {
@@ -93,7 +93,7 @@ void WeightOnlyGroupwiseQuantGemmPluginProfiler::computeTmpSize(int maxM, int n,
 
 std::vector<WeightOnlyGroupwiseQuantGemmPluginProfiler::Config> WeightOnlyGroupwiseQuantGemmPluginProfiler::getTactics(
     int m, int n, int k) const
-{
+{//@#quant called by profileTactics() of GemmPluginProfiler<Config, RunnerPtr, GemmIdType, GemmIdHashType>, before it call profileTacticsForProblem()
     return mRunner->getConfigs();
 }
 
@@ -148,6 +148,7 @@ void WeightOnlyGroupwiseQuantMatmulPlugin::init(nvinfer1::DataType type, int qua
     {
         if (quant_algo & FP8_ALPHA)
         {
+#ifdef ENABLE_FP8    //@#BUG some file still need cuda_fp8.h even though ENABLE_FP8=0
             // Ada & Hopper style kernels
             if (mArch < 89)
             {
@@ -167,6 +168,9 @@ void WeightOnlyGroupwiseQuantMatmulPlugin::init(nvinfer1::DataType type, int qua
                     = std::make_shared<tensorrt_llm::kernels::cutlass_kernels::CutlassFpAIntBGemmRunner<__nv_fp8_e4m3,
                         cutlass::uint4b_t, cutlass::WeightOnlyQuantOp::FINEGRAINED_SCALE_ONLY, half, half, half>>();
             }
+#else
+                TLLM_THROW("********************ENABLE_FP8 is FALSE******************");
+#endif
         }
         else
         {
@@ -205,7 +209,7 @@ void WeightOnlyGroupwiseQuantMatmulPlugin::init(nvinfer1::DataType type, int qua
         {
             if (quant_algo & ZERO)
             {
-                // has zeros
+                // has zeros @#quant
                 m_weightOnlyGroupwiseGemmRunner
                     = std::make_shared<tensorrt_llm::kernels::cutlass_kernels::CutlassFpAIntBGemmRunner<__nv_bfloat16,
                         cutlass::uint4b_t, cutlass::WeightOnlyQuantOp::FINEGRAINED_SCALE_AND_ZEROS>>();
@@ -241,7 +245,7 @@ nvinfer1::IPluginV2DynamicExt* WeightOnlyGroupwiseQuantMatmulPlugin::clone() con
 }
 
 void WeightOnlyGroupwiseQuantMatmulPlugin::configGemm()
-{
+{//@# called by initialize()
     mPluginProfiler->profileTactics(m_weightOnlyGroupwiseGemmRunner, mType, mDims, mGemmId);
 }
 
@@ -314,7 +318,7 @@ bool WeightOnlyGroupwiseQuantMatmulPlugin::supportsFormatCombination(
 
 void WeightOnlyGroupwiseQuantMatmulPlugin::configurePlugin(nvinfer1::DynamicPluginTensorDesc const* in, int nbInputs,
     nvinfer1::DynamicPluginTensorDesc const* out, int nbOutputs) noexcept
-{
+{//@#quant invoked before running the plugin
     auto const minM = std::accumulate(in[0].min.d, in[0].min.d + in[0].min.nbDims - 1, 1, std::multiplies<int>());
     auto const maxM = std::accumulate(in[0].max.d, in[0].max.d + in[0].max.nbDims - 1, 1, std::multiplies<int>());
 
@@ -339,7 +343,7 @@ void WeightOnlyGroupwiseQuantMatmulPlugin::configurePlugin(nvinfer1::DynamicPlug
 
 size_t WeightOnlyGroupwiseQuantMatmulPlugin::getWorkspaceSize(nvinfer1::PluginTensorDesc const* inputs, int nbInputs,
     nvinfer1::PluginTensorDesc const* outputs, int nbOutputs) const noexcept
-{
+{//@#quant invoked before running the plugin, after configurePlugin()
     return m_workspaceMaxSize;
 }
 
@@ -350,7 +354,7 @@ int WeightOnlyGroupwiseQuantMatmulPlugin::enqueue(nvinfer1::PluginTensorDesc con
     // inputs
     //   0 activations      [M, K]
     //   1 pre-quant scales [K]
-    //   2 weights          [K, N/2]
+    //   2 weights          [K, N/2]   @#quant 这个除以2不一定对，参考tests/quantization/test_weight_only_groupwise_quant_matmul.py._woq_groupwise_matmul()的赋值那段，其实要除以的是32bit中能存放的元素个数，而这个在传入前的外面就除了
     //   3 scales           [K // group_size, N]
     //   4 zeros            [K // group_size, N]
     //   5 biases           [M]
@@ -387,9 +391,13 @@ int WeightOnlyGroupwiseQuantMatmulPlugin::enqueue(nvinfer1::PluginTensorDesc con
         {
             if (mQuantAlgo & FP8_ALPHA)
             {
+#ifdef ENABLE_FP8    //@#BUG some file still need cuda_fp8.h even though ENABLE_FP8=0
                 tensorrt_llm::kernels::apply_per_channel_scale_kernel_launcher<half, __nv_fp8_e4m3>(
                     reinterpret_cast<__nv_fp8_e4m3*>(workspace), reinterpret_cast<half const*>(inputs[0]),
                     reinterpret_cast<half const*>(inputs[mPreQuantScaleInputIdx]), m, k, stream);
+#else
+                TLLM_THROW("********************ENABLE_FP8 is FALSE******************");
+#endif
             }
             else
             {
@@ -403,9 +411,13 @@ int WeightOnlyGroupwiseQuantMatmulPlugin::enqueue(nvinfer1::PluginTensorDesc con
         {
             if (mQuantAlgo & FP8_ALPHA)
             {
+#ifdef ENABLE_FP8    //@#BUG some file still need cuda_fp8.h even though ENABLE_FP8=0
                 tensorrt_llm::kernels::apply_per_channel_scale_kernel_launcher<__nv_bfloat16, __nv_fp8_e4m3>(
                     reinterpret_cast<__nv_fp8_e4m3*>(workspace), reinterpret_cast<__nv_bfloat16 const*>(inputs[0]),
                     reinterpret_cast<__nv_bfloat16 const*>(inputs[mPreQuantScaleInputIdx]), m, k, stream);
+#else
+                TLLM_THROW("********************ENABLE_FP8 is FALSE******************");
+#endif
             }
             else
             {
@@ -459,7 +471,7 @@ int WeightOnlyGroupwiseQuantMatmulPlugin::enqueue(nvinfer1::PluginTensorDesc con
             "engine.)");
         m_weightOnlyGroupwiseGemmRunner->gemm(act_ptr, weight_ptr, inputs[mScalesInputIdx], zeros_ptr, biases_ptr,
             alpha, outputs[0], m, real_n, k, mGroupSize, *bestTactic,
-            reinterpret_cast<char*>(workspace) + m * k * sizeof(half), ws_bytes, stream);
+            reinterpret_cast<char*>(workspace) + m * k * sizeof(half), ws_bytes, stream);//@#quant
     }
     return 0;
 }
@@ -490,7 +502,7 @@ int WeightOnlyGroupwiseQuantMatmulPlugin::getNbOutputs() const noexcept
 }
 
 int WeightOnlyGroupwiseQuantMatmulPlugin::initialize() noexcept
-{
+{//@#quant invoked before running the plugin, after getWorkspaceSize()
     configGemm();
     return 0;
 }
@@ -564,7 +576,7 @@ IPluginV2* WeightOnlyGroupwiseQuantMatmulPluginCreator::createPlugin(
     {
         char const* attrName = fields[i].name;
         if (!strcmp(attrName, "quant_algo"))
-        {
+        {//@#quant tests/quantization/test_weight_only_groupwise_quant_matmul.py中把quant_algo每个二进制位都设置为特定含义
             TLLM_CHECK(fields[i].type == PluginFieldType::kINT32);
             QuantAlgo = static_cast<int>(*(static_cast<int const*>(fields[i].data)));
         }
@@ -573,7 +585,7 @@ IPluginV2* WeightOnlyGroupwiseQuantMatmulPluginCreator::createPlugin(
             TLLM_CHECK(fields[i].type == PluginFieldType::kINT32);
             GroupSize = static_cast<int>(*(static_cast<int const*>(fields[i].data)));
         }
-        else if (!strcmp(attrName, "type_id"))
+        else if (!strcmp(attrName, "type_id")) //@#quant 一般是输入输出的dtype id
         {
             TLLM_CHECK(fields[i].type == PluginFieldType::kINT32);
             type = static_cast<nvinfer1::DataType>(*(static_cast<nvinfer1::DataType const*>(fields[i].data)));
@@ -595,7 +607,7 @@ IPluginV2* WeightOnlyGroupwiseQuantMatmulPluginCreator::createPlugin(
     return nullptr;
 }
 
-IPluginV2* WeightOnlyGroupwiseQuantMatmulPluginCreator::deserializePlugin(
+IPluginV2* WeightOnlyGroupwiseQuantMatmulPluginCreator::deserializePlugin(//@# 当plugin被create后会先做一轮profiler，然后plugin连同profile结果做serialize，然后再deserializePlugin去运行。。。。好麻烦
     char const* name, void const* serialData, size_t serialLength) noexcept
 {
     // This object will be deleted when the network is destroyed, which will

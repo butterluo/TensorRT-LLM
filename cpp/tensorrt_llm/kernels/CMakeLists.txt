@@ -24,6 +24,7 @@ list(FILTER SRC_CPP EXCLUDE REGEX "cutlass_kernels/.*")
 list(FILTER SRC_CU EXCLUDE REGEX "cutlass_kernels/.*")
 list(FILTER SRC_CPP EXCLUDE REGEX "decoderMaskedMultiheadAttention/.*")
 list(FILTER SRC_CU EXCLUDE REGEX "decoderMaskedMultiheadAttention/.*")
+# list(FILTER SRC_CU EXCLUDE REGEX "unfusedAttentionKernels/.*") #@#MODIFY add to exclude unfusedAttentionKernels folder cause it still use fp8 even though the ENABLE_FP8=0
 
 function(filter_cuda_archs ARCH SOURCES_VAR)
   if(NOT "${ARCH}" IN_LIST CMAKE_CUDA_ARCHITECTURES_ORIG

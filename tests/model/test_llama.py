@@ -97,7 +97,7 @@ class TestLLaMA(unittest.TestCase):
                 max_batch_size=batch_size,
                 max_input_len=input_len,
                 max_seq_len=input_len + output_len,
-                max_num_tokens=batch_size * input_len,
+                max_num_tokens=batch_size * input_len,#@#??? 为何不是batch_size*max_seq_len?
                 use_cache=True,
                 max_beam_width=beam_width)
             # Forward
@@ -132,7 +132,7 @@ class TestLLaMA(unittest.TestCase):
                 timing_cache='model.cache',
                 tensor_parallel=world_size,  # TP only
                 use_refit=use_refit,
-                strongly_typed=True,
+                strongly_typed=True, #@#???
             )
             network = builder.create_network()
             network.plugin_config.to_legacy_setting()
