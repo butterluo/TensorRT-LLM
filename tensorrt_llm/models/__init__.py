@@ -32,6 +32,8 @@ from .gptneox.model import GPTNeoXForCausalLM, GPTNeoXModel
 from .grok.model import GrokForCausalLM
 from .llama.config import LLaMAConfig
 from .llama.model import LLaMAForCausalLM, LLaMAModel
+from .llamaLL.config import LLaMALLConfig
+from .llamaLL.model import LLaMALLForCausalLM, LLaMALLModel
 from .mamba.model import MambaForCausalLM
 from .medusa.config import MedusaConfig
 from .medusa.model import MedusaForCausalLm
@@ -61,6 +63,9 @@ __all__ = [
     'LLaMAConfig',
     'LLaMAForCausalLM',
     'LLaMAModel',
+    'LLaMALLConfig',
+    'LLaMALLForCausalLM',
+    'LLaMALLModel',
     'MedusaConfig',
     'MedusaForCausalLm',
     'GPTJModel',
@@ -107,6 +112,7 @@ MODEL_MAP = {
     'MPTForCausalLM': MPTForCausalLM,
     'ChatGLMForCausalLM': ChatGLMForCausalLM,
     'LlamaForCausalLM': LLaMAForCausalLM,
+    'LlamaLLForCausalLM': LLaMALLForCausalLM,
     'MistralForCausalLM': LLaMAForCausalLM,
     'MixtralForCausalLM': LLaMAForCausalLM,
     'ArcticForCausalLM': LLaMAForCausalLM,

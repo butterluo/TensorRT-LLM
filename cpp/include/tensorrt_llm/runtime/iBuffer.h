@@ -23,9 +23,9 @@
 #include <NvInferRuntime.h>
 
 #include <cstdint>
-#ifdef ENABLE_FP8
+// #ifdef ENABLE_FP8 //@#BUG commet it to avoid compiled in ENABLE_FP8=0 situation
 #include <cuda_fp8.h>
-#endif
+// #endif
 #ifdef ENABLE_BF16
 #include <cuda_bf16.h>
 #endif
@@ -300,13 +300,13 @@ struct TRTDataType<__nv_bfloat16>
 };
 #endif
 
-#ifdef ENABLE_FP8
+// #ifdef ENABLE_FP8  //@#BUG commet it to avoid compiled in ENABLE_FP8=0 situation
 template <>
 struct TRTDataType<__nv_fp8_e4m3>
 {
     static constexpr auto value = nvinfer1::DataType::kFP8;
 };
-#endif
+// #endif
 
 template <>
 struct TRTDataType<kernels::KVCacheIndex>

@@ -47,6 +47,7 @@ set(PLUGIN_LISTS
     weightOnlyGroupwiseQuantMatmulPlugin
     weightOnlyQuantMatmulPlugin
     lookupPlugin
+    lookupGLPlugin
     loraPlugin
     mixtureOfExperts
     selectiveScanPlugin

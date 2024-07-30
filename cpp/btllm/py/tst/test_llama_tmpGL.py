@@ -25,9 +25,10 @@ from transformers import LlamaConfig, LlamaForCausalLM
 import tensorrt_llm
 from tensorrt_llm import Builder
 from tensorrt_llm._utils import str_dtype_to_trt, trt_dtype_to_str
-from tensorrt_llm.models.llamaLL.weight import (load_from_hf_llama,
-                                              load_from_meta_llama)
-from tensorrt_llm.models.modeling_utils import PretrainedConfig, optimize_model
+from tensorrt_llm.models import PretrainedConfig
+from tensorrt_llm.models.llama.convert import (load_weights_from_hf_model,
+                                               load_weights_from_meta_ckpt)
+from tensorrt_llm.models.modeling_utils import optimize_model
 from tensorrt_llm.network import net_guard
 from tensorrt_llm.plugin.plugin import ContextFMHAType
 
@@ -72,16 +73,10 @@ def _gen_tensorrt_llm_network( network, hf_llama,
             },
             "moe": {
                 "num_experts": 0,
-                "top_k": 0,
-                "tp_mode": 2,
                 "normalization_mode": 1
             },
             'use_parallel_embedding': False,
             'embedding_sharding_dim': 0,
-            'moe_num_experts': 0,
-            'moe_top_k': 0,
-            'moe_tp_mode': 2,
-            'moe_normalization_mode': 1,
         }
 
         # Initialize model
@@ -433,6 +428,7 @@ def test_llama( use_refit, fast_building, context_fmha_flag,
     np.testing.assert_allclose(ref.to(torch.float32).cpu().numpy(),
                                 res.to(torch.float32).cpu().numpy(),
                                 atol=0.12)
+    print("llllllllllllllll DONE lllllllllllllll")
 
 
 

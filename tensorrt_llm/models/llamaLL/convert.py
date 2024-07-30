@@ -1204,7 +1204,7 @@ def smooth_quant(model,
 
 def quantize(hf_model_dir: str,
              output_dir: str,
-             config: LLaMAConfig,
+             config: LLaMALLConfig,
              device: str = 'cuda',
              calib_dataset: str = 'cnn_dailymail'):
     '''
@@ -1329,7 +1329,7 @@ class QkvWeightHelper:
         return fused_qkv
 
 
-def load_weights_from_hf_by_shard(model_dir: str, config: LLaMAConfig):
+def load_weights_from_hf_by_shard(model_dir: str, config: LLaMALLConfig):
     '''Weights-only quantization is the only supported quantization recipe here.'''
     logger.info('Loading weights from HF LLaMA...')
     quant_algo = config.quantization.quant_algo
@@ -1500,7 +1500,7 @@ def load_weights_from_hf_by_shard(model_dir: str, config: LLaMAConfig):
     return weights
 
 
-def load_weights_from_hf_safetensors(model_dir: str, config: LLaMAConfig):
+def load_weights_from_hf_safetensors(model_dir: str, config: LLaMALLConfig):
     logger.info('Loading weights from Huggingface LLaMA safetensors...')
     tik = time.time()
     import json
@@ -1719,7 +1719,7 @@ def load_weights_from_hf_safetensors(model_dir: str, config: LLaMAConfig):
     return weights
 
 
-def load_weights_from_gptq(quant_ckpt_path: str, config: LLaMAConfig):
+def load_weights_from_gptq(quant_ckpt_path: str, config: LLaMALLConfig):
     logger.info('Loading weights from groupwise GPTQ LLaMA safetensors...')
     weights = {}
     tik = time.time()
@@ -1905,7 +1905,7 @@ def load_weights_from_gptq(quant_ckpt_path: str, config: LLaMAConfig):
     return weights
 
 
-def load_weights_from_meta_ckpt(meta_ckpt_dir: str, config: LLaMAConfig):
+def load_weights_from_meta_ckpt(meta_ckpt_dir: str, config: LLaMALLConfig):
     torch_dtype = str_dtype_to_torch(config.dtype)
     mapping = config.mapping
     weights = {}

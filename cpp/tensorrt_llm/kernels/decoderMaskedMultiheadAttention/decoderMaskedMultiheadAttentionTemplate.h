@@ -2705,7 +2705,7 @@ __global__ void __launch_bounds__(MAX_THEADS_PER_BLOCK, MIN_BLOCKS_PER_SM) maske
         // by combining all the partial max/sum and outputs
         ////////////////////
         ////////////////////
-        if (__syncthreads_or(last_block))
+        if (__syncthreads_or(last_block))//@# 该函数在__syncthreads()函数基础上，当且仅当块内存在任意一个线程predicate值非0时返回一个非0值。即在last_blk的情况下才执行以下逻辑.
         {
 
             ////////////////////

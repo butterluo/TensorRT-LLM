@@ -159,3 +159,85 @@ class PromptTuningEmbedding(Embedding):
         # combine the correct sources of embedding: normal/prompt
         return where(unsqueeze(prompt_tokens_mask, -1), prompt_embeddings,
                      normal_embeddings)
+
+
+
+class EmbRms(Module):
+    def __init__(self,
+                 num_embeddings: int,
+                 embedding_dim: int,
+                 dtype: Optional[str] = None,
+                 tp_size: int = 1,
+                 tp_group: Optional[list] = None,
+                 sharding_dim: int = 0,
+                 tp_rank: Optional[int] = None):
+        super().__init__()
+        # num_embeddings records the total vocab size no matter using TP or not
+        self.num_embeddings = num_embeddings
+        self.embedding_dim = embedding_dim
+        self.tp_size = tp_size
+        self.tp_group = tp_group
+        self.sharding_dim = sharding_dim
+        self.tp_rank = tp_rank
+        self.dtype = dtype
+
+        if sharding_dim == 1:
+            self.weight = Parameter(shape=(self.num_embeddings,
+                                           self.embedding_dim // self.tp_size),
+                                    dtype=dtype)
+        elif sharding_dim == 0:
+            self.weight = Parameter(shape=(math.ceil(
+                self.num_embeddings / self.tp_size), self.embedding_dim),
+                                    dtype=dtype)
+
+        set_obj_attrs(self.weight, {
+            "weight_loader": self.weight_loader,
+        })
+
+        self.gamma = Parameter(shape=self.embedding_dim, dtype=self.dtype)
+
+    def forward(self, x):
+        return embedding(x,
+                         self.weight.value,
+                         tp_size=self.tp_size,
+                         tp_group=self.tp_group,
+                         sharding_dim=self.sharding_dim,
+                         tp_rank=self.tp_rank)
+
+    def weight_loader(self, mapping: Mapping, param: Parameter,
+                      loaded_weight: torch.Tensor):
+        # use_parallel_embedding
+        tp_rank = mapping.tp_rank
+        if self.tp_size > 1:
+            sharding_dim = self.sharding_dim
+            shard_size = param._shape[sharding_dim]
+            start_idx = tp_rank * shard_size
+            loaded_weight = loaded_weight.narrow(sharding_dim, start_idx,
+                                                 shard_size)
+        param.value = loaded_weight
+
+
+# class RmsNorm(Module):
+
+#     def __init__(self,
+#                  normalized_shape,
+#                  eps=1e-06,
+#                  elementwise_affine=True,
+#                  dtype=None):
+#         super().__init__()
+#         if isinstance(normalized_shape, int):
+#             normalized_shape = (normalized_shape, )
+#         self.normalized_shape = tuple(normalized_shape)
+#         self.elementwise_affine = elementwise_affine
+#         if self.elementwise_affine:
+#             self.weight = Parameter(shape=self.normalized_shape, dtype=dtype)
+#         else:
+#             self.register_parameter('weight', None)
+
+#         self.eps = eps
+#         self.dtype = dtype
+
+#     def forward(self, x):
+#         weight = None if self.weight is None else self.weight.value
+#         return rms_norm(x, self.normalized_shape, weight, self.eps)
+
