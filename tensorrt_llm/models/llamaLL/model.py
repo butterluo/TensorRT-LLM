@@ -123,10 +123,10 @@ class LLaMALLDecoderLayer(Module):
         self.layer_idx = layer_idx
         self.config = config
 
-        self.input_layernorm = RmsNorm(normalized_shape=config.hidden_size,
-                                       eps=config.norm_epsilon,
-                                       dtype=config.dtype)
-        # self.input_layernorm =tensorrt_llm.functionalGL.RmsResid(config.hidden_size,config.dtype) #@#
+        # self.input_layernorm = RmsNorm(normalized_shape=config.hidden_size,
+        #                                eps=config.norm_epsilon,
+        #                                dtype=config.dtype)
+        self.input_layernorm =tensorrt_llm.functionalGL.RmsResid(config.hidden_size,config.dtype) #@#
 
         layers_range = config.mapping.pp_layers(config.num_hidden_layers)
         self.local_layer_idx = layer_idx - layers_range[0]
@@ -172,7 +172,7 @@ class LLaMALLDecoderLayer(Module):
         #                               eps=config.norm_epsilon,
         #                               dtype=config.dtype)
         self.post_layernorm =tensorrt_llm.functionalGL.RmsResid(config.hidden_size,config.dtype) #@#
-        
+
         # Residual MLP that applies on pre-attention input
         # TODO: change to self.has_residual_mlp = self.config.residual_mlp after ModelOpt quantize config is updated
         self.has_residual_mlp = False
@@ -264,7 +264,7 @@ class LLaMALLDecoderLayer(Module):
                 # hidden_states = residual + attention_output
                 # residual = hidden_states
                 # hidden_states = self.post_layernorm(hidden_states)
-                hidden_states, residual = self.post_layernorm(hidden_states, residual) #@#
+                hidden_states, residual = self.post_layernorm(attention_output, residual) #@#
             if next_layer_input_layernorm_args is not None:
                 raise ValueError("reduce_fusion NOT supported in llamaLL temporarily")
                 # hidden_states = self.mlp(
@@ -280,10 +280,10 @@ class LLaMALLDecoderLayer(Module):
             else:
                 hidden_states = self.mlp(hidden_states,
                                          lora_layer_params=lora_layer_params)
-                hidden_states = residual + hidden_states
-                residual = hidden_states
-                hidden_states = self.input_layernorm(hidden_states)
-                # hidden_states, residual = self.input_layernorm(hidden_states, residual) #@#
+                # hidden_states = residual + hidden_states
+                # residual = hidden_states
+                # hidden_states = self.input_layernorm(hidden_states)
+                hidden_states, residual = self.input_layernorm(hidden_states, residual) #@#
         if use_cache:
             return (residual, hidden_states, presents)
         return (residual, hidden_states)

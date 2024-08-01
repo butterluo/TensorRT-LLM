@@ -220,9 +220,9 @@ class EmbRms(Module):
                 self.num_embeddings / self.tp_size), self.embedding_dim),
                                     dtype=dtype)
 
-        set_obj_attrs(self.weight, {
-            "weight_loader": self.weight_loader,
-        })
+        # set_obj_attrs(self.weight, {
+        #     "weight_loader": self.weight_loader,
+        # })
 
         self.gamma = Parameter(shape=(self.embedding_dim,), dtype=self.dtype)
 
@@ -230,20 +230,20 @@ class EmbRms(Module):
 
     def forward(self, x):
         return emb_rms(input=x,
-                                                    weight=self.weight.value,
-                                                    gamma=self.gamma.value)
+                        weight=self.weight.value,
+                        gamma=self.gamma.value)
 
-    def weight_loader(self, mapping: Mapping, param: Parameter,
-                      loaded_weight: torch.Tensor):
-        # use_parallel_embedding
-        tp_rank = mapping.tp_rank
-        if self.tp_size > 1:
-            sharding_dim = self.sharding_dim
-            shard_size = param._shape[sharding_dim]
-            start_idx = tp_rank * shard_size
-            loaded_weight = loaded_weight.narrow(sharding_dim, start_idx,
-                                                 shard_size)
-        param.value = loaded_weight
+    # def weight_loader(self, mapping: Mapping, param: Parameter,
+    #                   loaded_weight: torch.Tensor):
+    #     # use_parallel_embedding
+    #     tp_rank = mapping.tp_rank
+    #     if self.tp_size > 1:
+    #         sharding_dim = self.sharding_dim
+    #         shard_size = param._shape[sharding_dim]
+    #         start_idx = tp_rank * shard_size
+    #         loaded_weight = loaded_weight.narrow(sharding_dim, start_idx,
+    #                                              shard_size)
+    #     param.value = loaded_weight
 
 
 class RmsResid(Module):
