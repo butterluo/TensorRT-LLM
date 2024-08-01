@@ -22,11 +22,14 @@ import torch
 from parameterized import parameterized
 from transformers import LlamaConfig, LlamaForCausalLM
 
+import time
+torch.random.manual_seed(time.time_ns())
+
 import tensorrt_llm
 from tensorrt_llm import Builder
 from tensorrt_llm._utils import str_dtype_to_trt, trt_dtype_to_str
 from tensorrt_llm.models import PretrainedConfig
-from tensorrt_llm.models.llama.convert import (load_weights_from_hf_model,
+from tensorrt_llm.models.llamaLL.convert import (load_weights_from_hf_model,
                                                load_weights_from_meta_ckpt)
 from tensorrt_llm.models.modeling_utils import optimize_model
 from tensorrt_llm.network import net_guard
@@ -42,7 +45,7 @@ EOS_TOKEN = 2
 PAD_TOKEN = 2
 
 def _gen_tensorrt_llm_network( network, hf_llama,
-                              llama_config: LlamaConfig, batch_size,
+                              hf_llama_config: LlamaConfig, batch_size,
                               beam_width, input_len, output_len, dtype,
                               rank, tensor_parallel, **opt_flags):
     list(range(tensor_parallel))
@@ -51,21 +54,21 @@ def _gen_tensorrt_llm_network( network, hf_llama,
         str_dtype_to_trt(dtype)
 
         config = {
-            'architecture': "LlamaForCausalLM",
+            'architecture': "LlamaLLForCausalLM",
             'dtype': dtype,
             'logits_dtype': 'float32',
-            'num_hidden_layers': llama_config.num_hidden_layers,
-            'num_attention_heads': llama_config.num_attention_heads,
-            'hidden_size': llama_config.hidden_size,
-            'intermediate_size': llama_config.intermediate_size,
-            'num_key_value_heads': llama_config.num_key_value_heads,
-            'vocab_size': llama_config.vocab_size,
+            'num_hidden_layers': hf_llama_config.num_hidden_layers,
+            'num_attention_heads': hf_llama_config.num_attention_heads,
+            'hidden_size': hf_llama_config.hidden_size,
+            'intermediate_size': hf_llama_config.intermediate_size,
+            'num_key_value_heads': hf_llama_config.num_key_value_heads,
+            'vocab_size': hf_llama_config.vocab_size,
             'position_embedding_type': 'rope_gpt_neox',
-            'max_position_embeddings': llama_config.max_position_embeddings,
-            'hidden_act': llama_config.hidden_act,
-            'rotary_base': getattr(llama_config, 'rotary_base', 10000.0),
-            'rotary_scaling': getattr(llama_config, 'rotary_scaling', None),
-            'norm_epsilon': llama_config.rms_norm_eps,
+            'max_position_embeddings': hf_llama_config.max_position_embeddings,
+            'hidden_act': hf_llama_config.hidden_act,
+            'rotary_base': getattr(hf_llama_config, 'rotary_base', 10000.0),
+            'rotary_scaling': getattr(hf_llama_config, 'rotary_scaling', None),
+            'norm_epsilon': hf_llama_config.rms_norm_eps,
             'mapping': {
                 'world_size': tensor_parallel,
                 'tp_size': tensor_parallel,
@@ -80,8 +83,8 @@ def _gen_tensorrt_llm_network( network, hf_llama,
         }
 
         # Initialize model
-        config = tensorrt_llm.models.LLaMAConfig.from_dict(config)
-        tensorrt_llm_llama = tensorrt_llm.models.LLaMAForCausalLM(config)
+        config = tensorrt_llm.models.LLaMALLConfig.from_dict(config)
+        tensorrt_llm_llama = tensorrt_llm.models.LLaMALLForCausalLM(config)
         weights = load_weights_from_hf_model(hf_llama, config)
         tensorrt_llm_llama.load(weights)
         optimize_model(tensorrt_llm_llama, **opt_flags)
@@ -234,6 +237,7 @@ def test_llama( use_refit, fast_building, context_fmha_flag,
     head_size = 32
     rank = 0
     llama_config = LlamaConfig()
+    llama_config.rms_norm_eps = 1e-5
     llama_config.hidden_act = hidden_act
     llama_config.num_hidden_layers = 2
     llama_config.max_position_embeddings = 64
@@ -430,7 +434,9 @@ def test_llama( use_refit, fast_building, context_fmha_flag,
                                 atol=0.12)
     print("llllllllllllllll DONE lllllllllllllll")
 
-
+"""
+修改 /home/bt/.local/lib/python3.10/site-packages/transformers/models/llama/modeling_llama.py的LlamaRMSNorm的weight从ones改成rand，以测试准确性
+"""
 
 if __name__ == '__main__':
     # unittest.main()

@@ -106,7 +106,7 @@ def test_embedding(dtype, use_lookup_plugin):
     network = builder.create_network()
 
     if use_lookup_plugin:
-        network.plugin_config.lookup_plugin = dtype
+        network.plugin_config.lookupGL_plugin = dtype
 
     with tensorrt_llm.net_guard(network):
         index = Tensor(name='index',

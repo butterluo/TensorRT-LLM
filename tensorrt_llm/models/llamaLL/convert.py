@@ -1125,8 +1125,8 @@ def load_weights_from_hf_model(hf_model,
             weight_name for weight_name in model_params
             if weight_name.find(prefix) != -1
         ]
-        for weight_name in cur_block_weights:
-            model_params[weight_name] = None
+        # for weight_name in cur_block_weights:  #@# layer.0. will be use below
+        #     model_params[weight_name] = None
 
     for l in layers_range:
         convert_layer(l)
@@ -1153,11 +1153,14 @@ def load_weights_from_hf_model(hf_model,
                             mapping.tp_size,
                             mapping.tp_rank,
                             dim=config.embedding_sharding_dim)
-
-    if mapping.is_first_pp_rank():
+    if mapping.is_first_pp_rank() and mapping.world_size == 1:
+        weights['transformer.embRms.weight'] = v
+        firstNrm = get_weight(model_params, 'model.layers.0.input_layernorm', dtype) #@#
+        weights['transformer.embRms.gamma'] = firstNrm
+    elif mapping.is_first_pp_rank():
         weights['transformer.vocab_embedding.weight'] = v
-        ln_f_w = get_weight(model_params, 'model.layers.0.input_layernorm', dtype) #@#
-        weights['transformer.ln_f.weight'] = ln_f_w
+        firstNrm = get_weight(model_params, 'model.layers.0.input_layernorm', dtype) #@#
+        weights['transformer.ln_f.weight'] = firstNrm
 
     lm_head_weights = get_weight(model_params, 'lm_head', dtype)
 

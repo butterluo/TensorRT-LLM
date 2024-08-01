@@ -33,6 +33,7 @@ from parameterized import parameterized
 
 import tensorrt_llm
 from tensorrt_llm import Tensor
+from tensorrt_llm.parameter import Parameter
 
 import time
 torch.random.manual_seed(time.time_ns())
@@ -47,7 +48,7 @@ class LlamaRMSNorm(nn.Module):
         LlamaRMSNorm is equivalent to T5LayerNorm
         """
         super().__init__()
-        self.weight = nn.Parameter(torch.ones(hidden_size))
+        self.weight = nn.Parameter(torch.rand(hidden_size))
         self.variance_epsilon = eps
 
     def forward(self, hidden_states):
@@ -108,10 +109,11 @@ def test_rmsResid(dtype):
         resid = Tensor(name='resid',
                         shape=resid_data.shape,
                         dtype=tensorrt_llm.str_dtype_to_trt(dtype))
-        
+        normalized_shape = (n_embed, )
         gamma = Tensor(name='gamma',
-                        shape=gamma_data.shape,
+                        shape=tuple(normalized_shape), #gamma_data.shape,
                         dtype=tensorrt_llm.str_dtype_to_trt(dtype))
+        # gamma = Parameter(shape=gamma_data.shape, dtype=dtype).value
 
         hid_aft_norm, resid2 = tensorrt_llm.functionalGL.resd_rms_plugin(input=inp,
                                                     residual=resid,

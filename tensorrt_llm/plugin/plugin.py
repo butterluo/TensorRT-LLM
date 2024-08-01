@@ -171,6 +171,8 @@ class PluginConfig(metaclass=PluginConfigMeta):
     _multiple_profiles: bool = field(default=False, init=False)
     _paged_state: bool = field(default=True, init=False)
     _streamingllm: bool = field(default=False, init=False)
+    #@# custm plugin start
+    _lookupGL_plugin: Optional[str] = field(default=None, init=False)
 
     def update_from_dict(self, config: dict):
         for name in config.keys():

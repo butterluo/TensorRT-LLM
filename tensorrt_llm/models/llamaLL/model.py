@@ -34,6 +34,8 @@ from .convert import (load_hf_llama, load_weights_from_hf_by_shard,
                       load_weights_from_hf_safetensors,
                       load_weights_from_meta_ckpt)
 
+import tensorrt_llm.functionalGL
+
 class DecoderLLLayerList(ModuleList):
 
     def __init__(self, cls, config):
@@ -124,6 +126,7 @@ class LLaMALLDecoderLayer(Module):
         self.input_layernorm = RmsNorm(normalized_shape=config.hidden_size,
                                        eps=config.norm_epsilon,
                                        dtype=config.dtype)
+        # self.input_layernorm =tensorrt_llm.functionalGL.RmsResid(config.hidden_size,config.dtype) #@#
 
         layers_range = config.mapping.pp_layers(config.num_hidden_layers)
         self.local_layer_idx = layer_idx - layers_range[0]
@@ -165,13 +168,14 @@ class LLaMALLDecoderLayer(Module):
                           quant_mode=config.quant_mode,
                           **mlp_kwargs)
 
-        self.post_layernorm = RmsNorm(normalized_shape=config.hidden_size,
-                                      eps=config.norm_epsilon,
-                                      dtype=config.dtype)
-
+        # self.post_layernorm = RmsNorm(normalized_shape=config.hidden_size,
+        #                               eps=config.norm_epsilon,
+        #                               dtype=config.dtype)
+        self.post_layernorm =tensorrt_llm.functionalGL.RmsResid(config.hidden_size,config.dtype) #@#
+        
         # Residual MLP that applies on pre-attention input
         # TODO: change to self.has_residual_mlp = self.config.residual_mlp after ModelOpt quantize config is updated
-        # self.has_residual_mlp = False
+        self.has_residual_mlp = False
         # if hasattr(self.config,
         #            "residual_mlp") and self.config.residual_mlp is True:
         #     self.has_residual_mlp = True
@@ -229,7 +233,8 @@ class LLaMALLDecoderLayer(Module):
                 AllReduceFusionOp.NONE,
                 residual=residual,
                 norm_weight=self.post_layernorm.weight.value,
-                eps=self.post_layernorm.eps))
+                # eps=self.post_layernorm.eps)) 
+                eps=self.config.norm_epsilon)) #@#
 
         if use_cache:
             attention_output, presents = attention_output
@@ -256,9 +261,10 @@ class LLaMALLDecoderLayer(Module):
                 raise ValueError("reduce_fusion NOT supported in llamaLL temporarily")
                 # hidden_states, residual = attention_output
             else:
-                hidden_states = residual + attention_output
-                residual = hidden_states
-                hidden_states = self.post_layernorm(hidden_states)
+                # hidden_states = residual + attention_output
+                # residual = hidden_states
+                # hidden_states = self.post_layernorm(hidden_states)
+                hidden_states, residual = self.post_layernorm(hidden_states, residual) #@#
             if next_layer_input_layernorm_args is not None:
                 raise ValueError("reduce_fusion NOT supported in llamaLL temporarily")
                 # hidden_states = self.mlp(
@@ -277,6 +283,7 @@ class LLaMALLDecoderLayer(Module):
                 hidden_states = residual + hidden_states
                 residual = hidden_states
                 hidden_states = self.input_layernorm(hidden_states)
+                # hidden_states, residual = self.input_layernorm(hidden_states, residual) #@#
         if use_cache:
             return (residual, hidden_states, presents)
         return (residual, hidden_states)
@@ -289,7 +296,11 @@ class LLaMALLModel(Module):
         init_all_reduce_helper()
 
         self.mapping = config.mapping
-        if self.mapping.is_first_pp_rank():
+        if  self.mapping.is_first_pp_rank() and self.mapping.world_size == 1:
+            self.embRms =tensorrt_llm.functionalGL. EmbRms(config.vocab_size,
+                          config.hidden_size,
+                          dtype=config.dtype)
+        elif self.mapping.is_first_pp_rank():
             self.vocab_embedding = Embedding(config.vocab_size,
                                              config.hidden_size,
                                              dtype=config.dtype)
@@ -316,8 +327,9 @@ class LLaMALLModel(Module):
         ptuning_args = [
             prompt_embedding_table, prompt_tasks, prompt_vocab_size
         ] if prompt_embedding_table is not None else []
-
-        if self.mapping.is_first_pp_rank():
+        if  self.mapping.is_first_pp_rank() and self.mapping.world_size == 1:
+            residual, hidden_states = self.embRms(input_ids)
+        elif self.mapping.is_first_pp_rank():
             hidden_states = self.vocab_embedding(input_ids, *ptuning_args)#@#TODO lookupPlugin py内调了reduce，要注意处理
             residual = hidden_states
             hidden_states = self.ln_f(hidden_states)

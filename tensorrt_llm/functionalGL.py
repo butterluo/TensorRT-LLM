@@ -20,6 +20,7 @@ from functools import partial
 from typing import List, Optional, Sequence, Tuple, Union
 
 import numpy as np
+import torch
 
 # isort: off
 import tensorrt as trt
@@ -36,6 +37,11 @@ from .network import PluginInfo, set_np_weight, set_plugin_info
 from .plugin import TRT_LLM_PLUGIN_NAMESPACE, current_all_reduce_helper
 from .quantization import QuantMode
 from .functional import Tensor, _create_tensor,_add_plugin_info
+
+from ._utils import set_obj_attrs
+from .mapping import Mapping
+from .module import Module
+from .parameter import Parameter
 
 
 def _lookupGL_plugin(input: Tensor, weight: Tensor,  gamma: Tensor, rank: int,
@@ -67,7 +73,7 @@ def _lookupGL_plugin(input: Tensor, weight: Tensor,  gamma: Tensor, rank: int,
         'LookupGL', '1', TRT_LLM_PLUGIN_NAMESPACE)
     assert plg_creator is not None
 
-    p_dtype = default_net().plugin_config.lookup_plugin
+    p_dtype = default_net().plugin_config.lookupGL_plugin
     pf_type = trt.PluginField(
         "type_id", np.array([int(str_dtype_to_trt(p_dtype))], np.int32),
         trt.PluginFieldType.INT32)
@@ -150,7 +156,7 @@ def emb_rms(input: Tensor,
         The tensor produced by the embedding lookup layer.
     '''
     if tp_size <=1 and tp_group is None:
-        x = _lookupGL_plugin(input,
+        resid, x = _lookupGL_plugin(input,
                                weight,
                                gamma,
                                rank=0,
@@ -159,7 +165,7 @@ def emb_rms(input: Tensor,
       raise ValueError(
                   'NOT support parallelism now'
               )
-    return x
+    return resid, x
 
 
 def resd_rms_plugin(input: Tensor,
@@ -182,3 +188,88 @@ def resd_rms_plugin(input: Tensor,
     resid =_create_tensor(layer.get_output(1), layer)
     hid_aft_norm = _create_tensor(layer.get_output(0), layer)
     return hid_aft_norm,resid
+
+
+class EmbRms(Module):
+    def __init__(self,
+                 num_embeddings: int,
+                 embedding_dim: int,
+                 dtype: Optional[str] = None,
+                 tp_size: int = 1,
+                 tp_group: Optional[list] = None,
+                 sharding_dim: int = 0,
+                 tp_rank: Optional[int] = None):
+        super().__init__()
+        # num_embeddings records the total vocab size no matter using TP or not
+        self.num_embeddings = num_embeddings
+        self.embedding_dim = embedding_dim
+        self.tp_size = tp_size
+        self.tp_group = tp_group
+        self.sharding_dim = sharding_dim
+        self.tp_rank = tp_rank
+        self.dtype = dtype
+
+        assert self.tp_size == 1 and self.tp_group is None and sharding_dim == 0 and self.tp_rank is None
+
+        if sharding_dim == 1:
+            self.weight = Parameter(shape=(self.num_embeddings,
+                                           self.embedding_dim // self.tp_size),
+                                    dtype=dtype)
+        elif sharding_dim == 0:
+            self.weight = Parameter(shape=(math.ceil(
+                self.num_embeddings / self.tp_size), self.embedding_dim),
+                                    dtype=dtype)
+
+        set_obj_attrs(self.weight, {
+            "weight_loader": self.weight_loader,
+        })
+
+        self.gamma = Parameter(shape=(self.embedding_dim,), dtype=self.dtype)
+
+        default_net().plugin_config.lookupGL_plugin = self.dtype
+
+    def forward(self, x):
+        return emb_rms(input=x,
+                                                    weight=self.weight.value,
+                                                    gamma=self.gamma.value)
+
+    def weight_loader(self, mapping: Mapping, param: Parameter,
+                      loaded_weight: torch.Tensor):
+        # use_parallel_embedding
+        tp_rank = mapping.tp_rank
+        if self.tp_size > 1:
+            sharding_dim = self.sharding_dim
+            shard_size = param._shape[sharding_dim]
+            start_idx = tp_rank * shard_size
+            loaded_weight = loaded_weight.narrow(sharding_dim, start_idx,
+                                                 shard_size)
+        param.value = loaded_weight
+
+
+class RmsResid(Module):
+
+    def __init__(self,
+                 normalized_shape,
+                #  eps=1e-06,
+                #  elementwise_affine=True,
+                 dtype=None):
+        super().__init__()
+        if isinstance(normalized_shape, int):
+            normalized_shape = (normalized_shape, )
+        self.normalized_shape = tuple(normalized_shape)
+        # self.elementwise_affine = elementwise_affine
+        # if self.elementwise_affine:
+        self.weight = Parameter(shape=self.normalized_shape, dtype=dtype)
+        # else:
+        #     self.register_parameter('weight', None)
+
+        # self.eps = eps
+        self.dtype = dtype
+
+    def forward(self, x, resid):
+        # weight = None if self.weight is None else self.weight.value
+        # return rms_norm(x, self.normalized_shape, weight, self.eps)
+        return resd_rms_plugin(input=x,
+                                residual=resid,
+                                gamma=self.weight.value,
+                                type=self.dtype)
