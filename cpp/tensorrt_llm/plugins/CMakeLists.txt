@@ -23,7 +23,8 @@ set(PLUGIN_EXPORT_MAP ${TARGET_DIR}/exports.map) # Linux
 set(PLUGIN_EXPORT_DEF ${TARGET_DIR}/exports.def) # Windows
 
 if(${CMAKE_BUILD_TYPE} MATCHES "Debug")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+  # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g") #@#change this line to below lines
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0")
 endif()
 
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --Wno-deprecated-declarations")
@@ -48,6 +49,7 @@ set(PLUGIN_LISTS
     weightOnlyQuantMatmulPlugin
     lookupPlugin
     lookupGLPlugin
+    rmsResidGLPlugin
     loraPlugin
     mixtureOfExperts
     selectiveScanPlugin

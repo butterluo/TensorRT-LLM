@@ -162,5 +162,23 @@ def emb_rms(input: Tensor,
     return x
 
 
+def resd_rms_plugin(input: Tensor,
+              residual: Tensor,
+              gamma: Tensor,
+              type='bfloat16') -> Tensor:
+    plg_creator = trt.get_plugin_registry().get_plugin_creator(
+        'RmsResidGL', '1', TRT_LLM_PLUGIN_NAMESPACE)
+    assert plg_creator is not None
 
+    pf_type = trt.PluginField(
+        "type_id", np.array([int(str_dtype_to_trt(type))], np.int32),
+        trt.PluginFieldType.INT32)
 
+    pfc = trt.PluginFieldCollection([pf_type])
+    rms_plug = plg_creator.create_plugin("rmsResidGL", pfc)
+    plug_inputs = [input.trt_tensor, gamma.trt_tensor, residual.trt_tensor]
+    layer = default_trtnet().add_plugin_v2(plug_inputs, rms_plug)
+    _add_plugin_info(layer, plg_creator, "rmsResidGL", pfc)
+    resid =_create_tensor(layer.get_output(1), layer)
+    hid_aft_norm = _create_tensor(layer.get_output(0), layer)
+    return hid_aft_norm,resid

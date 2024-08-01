@@ -97,7 +97,7 @@ bool LookupGLPlugin::supportsFormatCombination(
     {
         switch (pos)
         {
-        case 0: res = ((inOut[0].type == DataType::kINT32) && (inOut[0].format == TensorFormat::kLINEAR)); break;//input_ids
+        case 0: res = ((inOut[0].type == nvinfer1::DataType::kINT32) && (inOut[0].format == TensorFormat::kLINEAR)); break;//input_ids
         case 1: res = ((inOut[1].type == mType) && (inOut[1].format == TensorFormat::kLINEAR)); break;//weight(embTbl)
         case 2: res = ((inOut[2].type == mType) && (inOut[2].format == TensorFormat::kLINEAR)); break;//gama(RMS)
         case 3: res = ((inOut[3].type == mType) && (inOut[3].format == TensorFormat::kLINEAR)); break;//output[0](residual) 
@@ -160,7 +160,7 @@ int LookupGLPlugin::enqueue(nvinfer1::PluginTensorDesc const* inputDesc, nvinfer
     int offset = mRank * localVocabSize;
 
     if (mNbInputs == 3) {
-        if (mType == DataType::kBF16) {
+        if (mType == nvinfer1::DataType::kBF16) {
             __nv_bfloat16 const* weight = reinterpret_cast<__nv_bfloat16 const*>(inputs[1]);
             __nv_bfloat16 const* gamma = reinterpret_cast<__nv_bfloat16 const*>(inputs[2]);
             __nv_bfloat16* residual = reinterpret_cast<__nv_bfloat16*>(outputs[0]);

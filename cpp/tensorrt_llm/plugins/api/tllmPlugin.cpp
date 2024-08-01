@@ -46,7 +46,8 @@
 #include "tensorrt_llm/plugins/weightOnlyGroupwiseQuantMatmulPlugin/weightOnlyGroupwiseQuantMatmulPlugin.h"
 #include "tensorrt_llm/plugins/weightOnlyQuantMatmulPlugin/weightOnlyQuantMatmulPlugin.h"
 
-#include "tensorrt_llm/plugins/lookupGLPlugin/lookupGLPlugin.h"  //@# custom plugin
+#include "tensorrt_llm/plugins/lookupGLPlugin/lookupGLPlugin.h"  //@# custom plugin start
+#include "tensorrt_llm/plugins/rmsResidGLPlugin/rmsResidGLPlugin.h"  //@# custom plugin end
 
 #include <array>
 #include <cstdlib>
@@ -194,7 +195,8 @@ extern "C"
             weightOnlyGroupwiseQuantMatmulPluginCreator;
         static tensorrt_llm::plugins::WeightOnlyQuantMatmulPluginCreator weightOnlyQuantMatmulPluginCreator;
         static tensorrt_llm::plugins::LookupPluginCreator lookupPluginCreator;
-        static tensorrt_llm::plugins::LookupGLPluginCreator lookupGLPluginCreator;
+        static tensorrt_llm::plugins::LookupGLPluginCreator lookupGLPluginCreator;//@# custm plugin start
+        static tensorrt_llm::plugins::RmsResidGLPluginCreator rmsResidGLPluginCreator;//@# custm plugin end
         static tensorrt_llm::plugins::LoraPluginCreator loraPluginCreator;
         static tensorrt_llm::plugins::SelectiveScanPluginCreator selectiveScanPluginCreator;
         static tensorrt_llm::plugins::MambaConv1dPluginCreator mambaConv1DPluginCreator;
@@ -223,7 +225,8 @@ extern "C"
                   creatorPtr(weightOnlyGroupwiseQuantMatmulPluginCreator),
                   creatorPtr(weightOnlyQuantMatmulPluginCreator),
                   creatorPtr(lookupPluginCreator),
-                  creatorPtr(lookupGLPluginCreator),
+                  creatorPtr(lookupGLPluginCreator),//@# custm plugin start
+                  creatorPtr(rmsResidGLPluginCreator),//@# custm plugin end
                   creatorPtr(loraPluginCreator),
                   creatorPtr(selectiveScanPluginCreator),
                   creatorPtr(mambaConv1DPluginCreator),

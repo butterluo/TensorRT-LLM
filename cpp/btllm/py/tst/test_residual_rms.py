@@ -77,24 +77,19 @@ class LlamaRMSNorm(nn.Module):
 #         False,
 #     )],
 #                           name_func=unittest_name_func)
-def test_embedding(dtype, use_lookup_plugin):
+def test_rmsResid(dtype):
 
     # meta data
     batch_size = 10
-    vocab_size = 1000
+    seqLen = 1000
     n_embed = 1024
 
     # test data
-    ## input index
-    index_shape = (batch_size, )
-    index_data = torch.randint(0,
-                                vocab_size,
-                                index_shape,
-                                dtype=torch.int32,
-                                device="cuda")
-
-    ## weight data
-    weight_data = torch.rand(vocab_size,
+    input_data = torch.rand(batch_size, seqLen,
+                              n_embed,
+                              dtype=tensorrt_llm.str_dtype_to_torch(dtype),
+                              device="cuda")
+    resid_data = torch.rand(batch_size, seqLen,
                               n_embed,
                               dtype=tensorrt_llm.str_dtype_to_torch(dtype),
                               device="cuda")
@@ -105,53 +100,47 @@ def test_embedding(dtype, use_lookup_plugin):
     builder = tensorrt_llm.Builder()
     network = builder.create_network()
 
-    if use_lookup_plugin:
-        network.plugin_config.lookup_plugin = dtype
-
     with tensorrt_llm.net_guard(network):
-        index = Tensor(name='index',
-                        shape=index_data.shape,
-                        dtype=tensorrt_llm.str_dtype_to_trt('int32'))
+        inp = Tensor(name='input',
+                        shape=input_data.shape,
+                        dtype=tensorrt_llm.str_dtype_to_trt(dtype))
 
-        weight = Tensor(name='weight',
-                        shape=weight_data.shape,
+        resid = Tensor(name='resid',
+                        shape=resid_data.shape,
                         dtype=tensorrt_llm.str_dtype_to_trt(dtype))
         
         gamma = Tensor(name='gamma',
                         shape=gamma_data.shape,
                         dtype=tensorrt_llm.str_dtype_to_trt(dtype))
 
-        resid, hid_aft_norm = tensorrt_llm.functionalGL.emb_rms(input=index,
-                                                    weight=weight,
-                                                    gamma=gamma)
-        resid.mark_output('resid', dtype)
+        hid_aft_norm, resid2 = tensorrt_llm.functionalGL.resd_rms_plugin(input=inp,
+                                                    residual=resid,
+                                                    gamma=gamma,
+                                                    type=dtype)
         hid_aft_norm.mark_output('hid_aft_norm', dtype)
+        resid2.mark_output('resid2', dtype)
 
     # trt run
     session = create_session(builder, network, precision=dtype)
     inputs = {
-        'index': index_data,
-        'weight': weight_data,
-        'gamma' : gamma_data
+        'input': input_data,
+        'gamma' : gamma_data,
+        'resid': resid_data
     }
     outputs = run_session(session, inputs)
 
     # pytorch run
-    embedding = torch.nn.Embedding.from_pretrained(weight_data).cuda()
+    ref_resid2 = input_data + resid_data
     norm = LlamaRMSNorm(n_embed, eps=1e-5).cuda()
-    ref = embedding(index_data)
-    # ned = norm(ref)
-    # print(ned)
-    # print('-----------------------')
     norm.weight.data = gamma_data
-    ned2 = norm(ref)
+    ref_hid = norm(ref_resid2)
     # print(ned2)
 
     # compare diff
-    torch.testing.assert_close(ref, outputs['resid'])
-    print('-----------------------DONE resid---------------------')
-    torch.testing.assert_close(ned2, outputs['hid_aft_norm'])
+    torch.testing.assert_close(ref_resid2, outputs['resid2'])
+    print('-----------------------DONE resid2---------------------')
+    torch.testing.assert_close(ref_hid, outputs['hid_aft_norm'])
     print('-----------------------DONE hid_aft_norm---------------------')
 
 
-test_embedding('bfloat16', True)
+test_rmsResid('bfloat16')
