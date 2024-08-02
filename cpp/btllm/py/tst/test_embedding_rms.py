@@ -105,8 +105,8 @@ def test_embedding(dtype, use_lookup_plugin):
     builder = tensorrt_llm.Builder()
     network = builder.create_network()
 
-    if use_lookup_plugin:
-        network.plugin_config.lookupGL_plugin = dtype
+    # if use_lookup_plugin:
+    #     network.plugin_config.lookupGL_plugin = dtype
 
     with tensorrt_llm.net_guard(network):
         index = Tensor(name='index',
@@ -123,7 +123,8 @@ def test_embedding(dtype, use_lookup_plugin):
 
         resid, hid_aft_norm = tensorrt_llm.functionalGL.emb_rms(input=index,
                                                     weight=weight,
-                                                    gamma=gamma)
+                                                    gamma=gamma,
+                                                    dtype=dtype)
         resid.mark_output('resid', dtype)
         hid_aft_norm.mark_output('hid_aft_norm', dtype)
 

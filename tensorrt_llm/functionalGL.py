@@ -45,7 +45,7 @@ from .parameter import Parameter
 
 
 def _lookupGL_plugin(input: Tensor, weight: Tensor,  gamma: Tensor, rank: int,
-                   per_token_scale: Tensor) -> Tensor:
+                   per_token_scale: Tensor, dtype='bfloat16',) -> Tensor:
     '''
     Add an operation to perform lookup in a tensor.
 
@@ -73,7 +73,7 @@ def _lookupGL_plugin(input: Tensor, weight: Tensor,  gamma: Tensor, rank: int,
         'LookupGL', '1', TRT_LLM_PLUGIN_NAMESPACE)
     assert plg_creator is not None
 
-    p_dtype = default_net().plugin_config.lookupGL_plugin
+    p_dtype = dtype #default_net().plugin_config.lookupGL_plugin
     pf_type = trt.PluginField(
         "type_id", np.array([int(str_dtype_to_trt(p_dtype))], np.int32),
         trt.PluginFieldType.INT32)
@@ -97,6 +97,7 @@ def _lookupGL_plugin(input: Tensor, weight: Tensor,  gamma: Tensor, rank: int,
 def emb_rms(input: Tensor,
               weight: Tensor,
               gamma: Tensor,
+              dtype='bfloat16',
               tp_size=1,
               tp_group=None,
               sharding_dim=0,
@@ -160,7 +161,8 @@ def emb_rms(input: Tensor,
                                weight,
                                gamma,
                                rank=0,
-                               per_token_scale=per_token_scale)
+                               per_token_scale=per_token_scale, 
+                               dtype=dtype)
     else:
       raise ValueError(
                   'NOT support parallelism now'
@@ -226,12 +228,13 @@ class EmbRms(Module):
 
         self.gamma = Parameter(shape=(self.embedding_dim,), dtype=self.dtype)
 
-        default_net().plugin_config.lookupGL_plugin = self.dtype
+        # default_net().plugin_config.lookupGL_plugin = self.dtype
 
     def forward(self, x):
         return emb_rms(input=x,
                         weight=self.weight.value,
-                        gamma=self.gamma.value)
+                        gamma=self.gamma.value,
+                        dtype = self.dtype)
 
     # def weight_loader(self, mapping: Mapping, param: Parameter,
     #                   loaded_weight: torch.Tensor):

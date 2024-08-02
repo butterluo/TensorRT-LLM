@@ -396,5 +396,125 @@ void residualRmsNorm(RmsParams& params, nvinfer1::DataType dataType, cudaStream_
 } // namespace gl
 
 
+
+
+template <typename T, typename Tw = T, int tmpNum =1, bool Bias = false, bool Residual = false, bool Affine = false, bool UseSmem = false>
+__global__ void rms_norm_kernel(RmsParams params, T* residual, T* output, Idx const* input, Tw const* weight, int64_t const token_num, Idx const offset,
+    Idx const size, Idx const n_elems, Tw const* __restrict gamma)
+{
+    static constexpr int kPackedSize = details::kBytesPerAccess / sizeof(T);
+    using PackedStruct = typename PackedOn16Bytes<T>::Type;
+
+    // extern __shared__ uint8_t smem_ptr[];
+    // T* smem = reinterpret_cast<T*>(smem_ptr);
+
+    int bid = blockIdx.x, tid = threadIdx.x;
+
+    __shared__ int s_word_index;
+    if(tid == 0) {
+        s_word_index = input[blockIdx.x];
+    }
+    __syncthreads();
+    int word_index = s_word_index;
+
+    
+
+    T const* bias_buffer = reinterpret_cast<T const*>(params.fusion_params.bias_buffer);
+    T const* residual_buffer = reinterpret_cast<T const*>(params.fusion_params.residual_buffer);
+    T const* weight_buffer = reinterpret_cast<T const*>(params.fusion_params.weight_buffer);
+    T* local_final_output_buffer = reinterpret_cast<T*>(params.local_output_buffer_ptr);
+    T const* intermediate_buffer = reinterpret_cast<T const*>(params.fusion_params.intermediate_buffer);
+    T* residual_out = reinterpret_cast<T*>(params.fusion_params.residual_out);  //@#
+
+    int block_offset = bid * params.fusion_params.hidden_size;
+    int thread_offset = tid * kPackedSize;
+
+    if constexpr (Residual)
+    {
+        residual_buffer += block_offset;
+    }
+    local_final_output_buffer += block_offset;
+    intermediate_buffer += block_offset;
+    residual_out += block_offset;
+
+    PackedStruct inter_vec, weight_vec;
+    float acc = 0.f;
+    for (int offset = thread_offset; offset < params.fusion_params.hidden_size; offset += blockDim.x * kPackedSize)
+    {
+        inter_vec.packed = *reinterpret_cast<int4 const*>(intermediate_buffer + offset);
+        // if constexpr (Bias)
+        // {
+        //     PackedStruct bias_vec;
+        //     bias_vec.packed = *reinterpret_cast<int4 const*>(bias_buffer + offset);
+        //     inter_vec.packed = add128b(inter_vec, bias_vec);
+        // }
+        // if constexpr (Residual)
+        // {
+        //     PackedStruct residual_vec;
+        //     residual_vec.packed = *reinterpret_cast<int4 const*>(residual_buffer + offset);
+        //     inter_vec.packed = add128b(inter_vec, residual_vec);
+        //     // *reinterpret_cast<int4*>(intermediate_buffer + offset) = inter_vec.packed;
+            *reinterpret_cast<int4*>(residual_out + offset) = inter_vec.packed;
+        // }
+        acc = gl::accumulate<T>(acc, inter_vec);
+        // if constexpr (UseSmem)
+        // {
+        //     *reinterpret_cast<int4*>(&smem[offset]) = inter_vec.packed;
+        // }
+    }
+    acc = gl::block_reduce_sum(acc);
+    float denom = __fsqrt_rn(__fdividef(acc, params.fusion_params.hidden_size) + EPS);
+    for (int offset = thread_offset; offset < params.fusion_params.hidden_size; offset += blockDim.x * kPackedSize)
+    {
+        // if constexpr (UseSmem)
+        // {
+        //     inter_vec.packed = *reinterpret_cast<int4 const*>(&smem[offset]);
+        // }
+        // if constexpr (Affine)
+        {
+            weight_vec.packed = *reinterpret_cast<int4 const*>(weight_buffer + offset);
+        // }
+        inter_vec.packed = rms_norm<T, Affine>(denom, inter_vec, weight_vec);
+        *reinterpret_cast<int4*>(&local_final_output_buffer[offset]) = inter_vec.packed;
+    }
+}
+
+
+
+template <typename T, typename Tw, typename Idx>
+void invokeLookUpRms(T* residual, T* out, Idx const* input, Tw const* weight, int64_t const token_num, Idx const offset, Idx const size,
+    Idx const n_embed, Tw const* gamma, cudaStream_t stream)
+{
+    sync_check_cuda_error();
+    static constexpr int kPackedSize = gl::details::kBytesPerAccess / sizeof(T);
+    TLLM_CHECK(n_embed % kPackedSize == 0);
+    int need_threads = n_embed / kPackedSize;
+    int cta_size;
+    if (need_threads <= gl::details::kMaxCtaSize)
+    {
+        cta_size = (need_threads + gl::details::kWarpSize - 1) / gl::details::kWarpSize * gl::details::kWarpSize;
+    }
+    else
+    {
+        cta_size = gl::details::kMaxCtaSize;
+    }
+    int cta_num = token_num;
+    int smem_size = 0;
+    if (cta_size * details::kBytesPerAccess / sizeof(T) >= params.fusion_params.hidden_size)
+    {
+        rms_norm_kernel<T, Bias, Residual, Affine, false><<<cta_num, cta_size, smem_size, stream>>>(params);
+    }
+    else
+    {
+        // smem_size = params.fusion_params.hidden_size * sizeof(T);
+        // rms_norm_kernel<T, Bias, Residual, Affine, true><<<cta_num, cta_size, smem_size, stream>>>(params);
+        TLLM_THROW("hidSz is too large. NOT supported");
+    }
+    sync_check_cuda_error();
+}
+
+
+
+
 } // namespace kernels
 } // namespace tensorrt_llm

@@ -370,6 +370,40 @@ _allowed_configs = {
                     max_seq_len=712,
                     builder_opt=None,
                 )),
+    "llama_tiny":
+    ModelConfig(name="llama_tiny",                           #@#
+                family="llama",
+                benchmark_type="gpt",
+                build_config=BuildConfig(
+                    num_layers=40,
+                    num_heads=8,
+                    hidden_size=1024,
+                    vocab_size=32000,
+                    hidden_act='silu',
+                    n_positions=4096,
+                    inter_size=11008,
+                    max_batch_size=128,
+                    max_input_len=512,
+                    max_seq_len=712,
+                    builder_opt=None,
+                )),
+    "llamall_tiny":
+    ModelConfig(name="llamall_tiny",                           #@#
+                family="llamaLL",
+                benchmark_type="gpt",
+                build_config=BuildConfig(
+                    num_layers=40,
+                    num_heads=8,
+                    hidden_size=1024,
+                    vocab_size=32000,
+                    hidden_act='silu',
+                    n_positions=4096,
+                    inter_size=11008,
+                    max_batch_size=128,
+                    max_input_len=512,
+                    max_seq_len=712,
+                    builder_opt=None,
+                )),
     "llama_13b":
     ModelConfig(name="llama_13b",
                 family="llama",

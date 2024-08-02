@@ -445,6 +445,50 @@ def build_gpt(args):
         tensorrt_llm_model = tensorrt_llm.models.LLaMAForCausalLM(config)
         tensorrt_llm_model = optimize_model(tensorrt_llm_model,
                                             use_fused_mlp=True)
+    elif family == "llamaLL":
+        config = {
+            'architecture':
+            'LlamaLLForCausalLM',
+            'dtype':
+            args.dtype,
+            'num_hidden_layers':
+            build_config['num_layers'],
+            'num_attention_heads':
+            build_config['num_heads'],
+            'num_key_value_heads':
+            build_config['num_heads'] if build_config['num_kv_heads'] is None
+            else build_config['num_kv_heads'],
+            'hidden_size':
+            build_config['hidden_size'],
+            'intermediate_size':
+            build_config['inter_size'],
+            'vocab_size':
+            build_config['vocab_size'],
+            'position_embedding_type':
+            'rope_gpt_neox',
+            'max_position_embeddings':
+            build_config['n_positions'],
+            'hidden_act':
+            build_config['hidden_act'],
+            'quantization': {
+                'quant_algo': quant_algo,
+                'kv_cache_quant_algo': kv_cache_quant_algo,
+                'group_size': 128
+            },
+            'mapping': {
+                'world_size': world_size,
+                'tp_size': world_size
+            },
+            'moe': {
+                'num_experts': build_config["moe_num_experts"],
+                'top_k': build_config["moe_top_k"],
+            }
+        }
+        config = PretrainedConfig.from_dict(config)
+        tensorrt_llm_model = tensorrt_llm.models.LLaMALLForCausalLM(config)
+        tensorrt_llm_model = optimize_model(tensorrt_llm_model,
+                                            use_fused_mlp=True)
+
     elif family == "gptj":
         config = {
             'architecture': 'GPTJForCausalLM',
