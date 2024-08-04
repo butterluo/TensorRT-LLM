@@ -25,6 +25,8 @@ template <typename Tout, typename Tw, typename Idx>
 void invokeLookUpRms(Tout* residual, Tout* out, Idx const* input, Tw const* weight, int64_t const token_num, Idx const offset,
     Idx const size, Idx const n_embed, Tw const* gamma, cudaStream_t stream = 0);
 
+template <typename T>
+void invokeRmsResid(T* output_resid, T* output, T const* input, T const* input_resid, int const n_embed/*hidSz*/, T const* gamma, int64_t const token_num, cudaStream_t stream);
 
 
 namespace gl {

@@ -107,24 +107,43 @@ int RmsResidGLPlugin::enqueue(nvinfer1::PluginTensorDesc const* inputDesc, nvinf
     {
         return 0;
     }
-    size_t size = 1;
-    for (int i = 0; i < inputDesc[0].dims.nbDims; ++i)
+    // size_t size = 1;
+    // for (int i = 0; i < inputDesc[0].dims.nbDims; ++i)
+    // {
+    //     size *= inputDesc[0].dims.d[i];
+    // }
+    // auto const sizePerElem = common::getDTypeSize(mType);
+
+    // tensorrt_llm::kernels::gl::RmsParams params;
+    // params.fusion_params.bias_buffer = nullptr;
+    // params.fusion_params.residual_buffer = inputs[2];
+    // params.fusion_params.weight_buffer = inputs[1];
+    // params.local_output_buffer_ptr = outputs[0];
+    // params.fusion_params.residual_out = outputs[1];
+    // params.elts_total = size;
+    // params.fusion_params.hidden_size = inputDesc[0].dims.d[inputDesc[0].dims.nbDims - 1];
+    // params.fusion_params.intermediate_buffer = inputs[0];
+    // tensorrt_llm::kernels::gl::residualRmsNorm(params, mType, stream);
+
+    size_t token_num = 1;
+    for (int i = 0; i < inputDesc[0].dims.nbDims - 1; ++i)
     {
-        size *= inputDesc[0].dims.d[i];
+        token_num *= inputDesc[0].dims.d[i];
     }
-    auto const sizePerElem = common::getDTypeSize(mType);
-
-    tensorrt_llm::kernels::gl::RmsParams params;
-    params.fusion_params.bias_buffer = nullptr;
-    params.fusion_params.residual_buffer = inputs[2];
-    params.fusion_params.weight_buffer = inputs[1];
-    params.local_output_buffer_ptr = outputs[0];
-    params.fusion_params.residual_out = outputs[1];
-    params.elts_total = size;
-    params.fusion_params.hidden_size = inputDesc[0].dims.d[inputDesc[0].dims.nbDims - 1];
-    params.fusion_params.intermediate_buffer = inputs[0];
-    tensorrt_llm::kernels::gl::residualRmsNorm(params, mType, stream);
-
+    int hidden_size = inputDesc[0].dims.d[inputDesc[0].dims.nbDims - 1];
+    switch (mType) {
+        case nvinfer1::DataType::kBF16: {
+                __nv_bfloat16 const* hidStat = reinterpret_cast<__nv_bfloat16 const*>(inputs[0]);
+                __nv_bfloat16 const* gamma = reinterpret_cast<__nv_bfloat16 const*>(inputs[1]);
+                __nv_bfloat16 const* residual = reinterpret_cast<__nv_bfloat16 const*>(inputs[2]);
+                __nv_bfloat16* hidAfterRms = reinterpret_cast<__nv_bfloat16*>(outputs[0]);
+                __nv_bfloat16* residualAfterAdd = reinterpret_cast<__nv_bfloat16*>(outputs[1]);
+                tensorrt_llm::kernels::invokeRmsResid(residualAfterAdd, hidAfterRms, hidStat, residual, hidden_size, gamma, token_num, stream);
+            }
+            break;
+        default:  TLLM_THROW("Unsupported dataType for RmsResidGLPlugin");
+    }
+    
     return 0;
 }
 

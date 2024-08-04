@@ -83,7 +83,7 @@ def test_rmsResid(dtype):
     # meta data
     batch_size = 10
     seqLen = 1000
-    n_embed = 1024
+    n_embed = 6656#1024,2560,3072,4096,5120,6656,8192
 
     # test data
     input_data = torch.rand(batch_size, seqLen,

@@ -82,7 +82,7 @@ def test_embedding(dtype, use_lookup_plugin):
     # meta data
     batch_size = 10
     vocab_size = 1000
-    n_embed = 1024
+    n_embed = 8192#1024,2560,3072,4096,5120,6656,8192
 
     # test data
     ## input index

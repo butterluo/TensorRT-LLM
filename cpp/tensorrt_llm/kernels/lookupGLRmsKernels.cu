@@ -24,113 +24,6 @@ namespace tensorrt_llm
 {
 namespace kernels
 {
-/* When running with multiple GPUs, we split the embedding lookup table across multiple GPUs to save the memory
-requirements of embedding lookup table ([vocab_size, hidden]). This operation is equivalent to the single GPU version of
-embedding() (i.e.add_gather() operation in TensorRT). As only a portion of embedding lookup table
-([ceil(vocab_size/world_size), hidden]) is stored in each GPU and the value range of input IDs is [0, vocab_size]. The
-add_gather() operation in TensorRT cannot get the correct results. So, we need to write a plugin to add an offset to
-input IDs and get the correct results.
-
- * Input: Input IDs (input[token_num])
-   Input: Embedding Lookup Table (weight[ceil(vocab_size/world_size), hidden])
-   Output: weight[input[idx]-offset,hidden]
-
- * The total thread number equals to token_num*hidden
- *
- * If the input ids is out of range it writes zero, otherwise it writes the correct embedding result.
- */
-template <typename T, typename Tw, typename Idx, int tmpNum>
-__global__ void lookupRmsKernel(T* residual, T* output, Idx const* input, Tw const* weight, int64_t const token_num, Idx const offset,
-    Idx const size, Idx const n_elems, Tw const* __restrict gamma)
-{
-    __shared__ int word_index;
-    __shared__ float rms;
-    constexpr auto num_elems_T = num_elems<T>::value;
-    using float_packed_t = typename packed_as<float, num_elems_T>::type;
-    // int const n_elems = n_embed / num_elems_T;
-    int const n_embed = n_elems * num_elems_T;
-    int curIdx = 0;
-    T tmpArr[tmpNum] = {0};
-    float sqrSum = 0;
-    
-    if (threadIdx.x == 0)
-    {
-        word_index = input[blockIdx.x];
-    }
-    __syncthreads();
-    
-    if (word_index >= 0 && word_index < size) {
-        const float_packed_t rld = cuda_cast<float_packed_t,float>(1.f / float(n_embed));
-        for (int64_t index = threadIdx.x; index < n_elems; index += blockDim.x) {
-            // int64_t const word_index = input[index / n_embed] - offset;
-            // Idx const col_index = index % n_embed;
-            T embedding = weight[word_index * n_elems + index];
-            residual[blockIdx.x * n_elems + index] = embedding;
-            // output[index] = embedding;
-            tmpArr[curIdx] = embedding;
-            ++curIdx;
-            sqrSum = sqrSum + cuda_sum<float>( rld * cuda_cast<float_packed_t,T>(embedding) * cuda_cast<float_packed_t,T>(embedding) ); //@# MAYBUG
-        } // end for index
-
-    }
-    
-    ///////////////// RMS //////////////////
-    float blkSum = blockReduceSum(sqrSum);
-    curIdx = 0;
-    if (threadIdx.x == 0) {
-      rms = rsqrtf(blkSum + EPS);
-    }
-    __syncthreads();
-    float_packed_t tRms = cuda_cast<float_packed_t,float>(rms);
-    for (int i = threadIdx.x; i < n_elems; i += blockDim.x) {
-      T tmpVal = tmpArr[curIdx];
-      int const index = blockIdx.x * n_elems + i;
-      T g = ldg(&gamma[i]);
-      float_packed_t tVal = cuda_cast<float_packed_t,T>(tmpVal) * tRms * cuda_cast<float_packed_t,T>(g);
-      // output[index] = tmpVal * tRms * g;
-      output[index] = cuda_cast<T, float_packed_t>(tVal);
-    }
-}
-
-template <typename T, typename Tw, typename Idx>
-void invokeLookUpRms(T* residual, T* out, Idx const* input, Tw const* weight, int64_t const token_num, Idx const offset, Idx const size,
-    Idx const n_embed, Tw const* gamma, cudaStream_t stream)
-{
-    // int64_t constexpr max_block_num = 65536;
-    // Idx constexpr max_block_size = 512;
-    // dim3 grid(min(token_num, max_block_num));
-    // dim3 block(min(n_embed, max_block_size));
-    // lookup_kernel<T, Idx><<<grid, block, 0, stream>>>(out, input, weight, token_num, offset, size, n_embed);
-
-    dim3 grid(token_num);
-    constexpr int num_elems_T = num_elems<T>::value;
-    assert(n_embed % num_elems_T); //use macro to avoid assert in release version
-    int packedEmb = n_embed / num_elems_T;
-    dim3 block(min(packedEmb, 1024));
-    // Make sure block.x is multiple of 32 for warp shuffle to work
-    block.x = 32 * ((block.x + 31) / 32);
-
-    const int flod = packedEmb > 1024 ? 1 : ((packedEmb + 1023) /1024);//TODO remove, use n_embed as condition instead
-    if(flod < 2) {
-      lookupRmsKernel<T, Tw, Idx, 1><<<grid, block, 0, stream>>>(residual, out, input, weight, token_num, offset, size, packedEmb, gamma);
-    } else if (flod < 5) {
-      lookupRmsKernel<T, Tw, Idx, 4><<<grid, block, 0, stream>>>(residual, out, input, weight, token_num, offset, size, packedEmb, gamma);
-    } else {
-      lookupRmsKernel<T, Tw, Idx, 8><<<grid, block, 0, stream>>>(residual, out, input, weight, token_num, offset, size, packedEmb, gamma);
-    }
-    
-}
-
-#define INSTANTIATE_LOOK_UPRMS(T, Tw, Idx)                                                                                    \
-    template void invokeLookUpRms<T, Tw, Idx>(T* residual, T * out, Idx const* input, Tw const* weight, int64_t const token_num,            \
-        Idx const offset, Idx const size, Idx const n_embed, Tw const* gamma, cudaStream_t stream)
-
-// INSTANTIATE_LOOK_UPRMS(float, int);
-// INSTANTIATE_LOOK_UPRMS(half, int);
-
-#ifdef ENABLE_BF16
-INSTANTIATE_LOOK_UPRMS(__nv_bfloat16, __nv_bfloat16, int);
-#endif
 
 /////////////////////////////////////////// from customAllReduceKernels //////////////////////////////
 namespace gl {
@@ -398,12 +291,12 @@ void residualRmsNorm(RmsParams& params, nvinfer1::DataType dataType, cudaStream_
 
 
 
-template <typename T, typename Tw = T, int tmpNum =1, bool Bias = false, bool Residual = false, bool Affine = false, bool UseSmem = false>
-__global__ void rms_norm_kernel(RmsParams params, T* residual, T* output, Idx const* input, Tw const* weight, int64_t const token_num, Idx const offset,
+template <typename T, typename Tw = T, typename Idx>
+__global__ void lookupRmsKernel(T* residual, T* output, Idx const* input, Tw const* weight, int64_t const token_num, Idx const rankoffset,
     Idx const size, Idx const n_elems, Tw const* __restrict gamma)
 {
-    static constexpr int kPackedSize = details::kBytesPerAccess / sizeof(T);
-    using PackedStruct = typename PackedOn16Bytes<T>::Type;
+    static constexpr int kPackedSize = gl::details::kBytesPerAccess / sizeof(T);
+    using PackedStruct = typename gl::PackedOn16Bytes<T>::Type;
 
     // extern __shared__ uint8_t smem_ptr[];
     // T* smem = reinterpret_cast<T*>(smem_ptr);
@@ -416,67 +309,29 @@ __global__ void rms_norm_kernel(RmsParams params, T* residual, T* output, Idx co
     }
     __syncthreads();
     int word_index = s_word_index;
-
-    
-
-    T const* bias_buffer = reinterpret_cast<T const*>(params.fusion_params.bias_buffer);
-    T const* residual_buffer = reinterpret_cast<T const*>(params.fusion_params.residual_buffer);
-    T const* weight_buffer = reinterpret_cast<T const*>(params.fusion_params.weight_buffer);
-    T* local_final_output_buffer = reinterpret_cast<T*>(params.local_output_buffer_ptr);
-    T const* intermediate_buffer = reinterpret_cast<T const*>(params.fusion_params.intermediate_buffer);
-    T* residual_out = reinterpret_cast<T*>(params.fusion_params.residual_out);  //@#
-
-    int block_offset = bid * params.fusion_params.hidden_size;
-    int thread_offset = tid * kPackedSize;
-
-    if constexpr (Residual)
-    {
-        residual_buffer += block_offset;
-    }
-    local_final_output_buffer += block_offset;
-    intermediate_buffer += block_offset;
-    residual_out += block_offset;
-
-    PackedStruct inter_vec, weight_vec;
+    int offset = tid * kPackedSize;//thread_offset
+    int block_offset = bid * n_elems;
+    T* residual_out = residual + block_offset;
+    T* local_final_output_buffer = output + block_offset;
+    PackedStruct inter_vec, gamma_vec;
     float acc = 0.f;
-    for (int offset = thread_offset; offset < params.fusion_params.hidden_size; offset += blockDim.x * kPackedSize)
-    {
-        inter_vec.packed = *reinterpret_cast<int4 const*>(intermediate_buffer + offset);
-        // if constexpr (Bias)
-        // {
-        //     PackedStruct bias_vec;
-        //     bias_vec.packed = *reinterpret_cast<int4 const*>(bias_buffer + offset);
-        //     inter_vec.packed = add128b(inter_vec, bias_vec);
-        // }
-        // if constexpr (Residual)
-        // {
-        //     PackedStruct residual_vec;
-        //     residual_vec.packed = *reinterpret_cast<int4 const*>(residual_buffer + offset);
-        //     inter_vec.packed = add128b(inter_vec, residual_vec);
-        //     // *reinterpret_cast<int4*>(intermediate_buffer + offset) = inter_vec.packed;
-            *reinterpret_cast<int4*>(residual_out + offset) = inter_vec.packed;
-        // }
-        acc = gl::accumulate<T>(acc, inter_vec);
-        // if constexpr (UseSmem)
-        // {
-        //     *reinterpret_cast<int4*>(&smem[offset]) = inter_vec.packed;
-        // }
+    if (word_index >= 0 && word_index < size) {
+      // int wrd_offset = word_index * n_elems;
+      //for (int offset = thread_offset; offset < n_elems; offset += blockDim.x * kPackedSize) {
+      inter_vec.packed = *reinterpret_cast<int4 const*>(weight + (word_index * n_elems + offset));
+      *reinterpret_cast<int4*>(residual_out + offset) = inter_vec.packed;
+      acc = gl::accumulate<T>(acc, inter_vec);
+      //}end for
     }
+    
     acc = gl::block_reduce_sum(acc);
-    float denom = __fsqrt_rn(__fdividef(acc, params.fusion_params.hidden_size) + EPS);
-    for (int offset = thread_offset; offset < params.fusion_params.hidden_size; offset += blockDim.x * kPackedSize)
-    {
-        // if constexpr (UseSmem)
-        // {
-        //     inter_vec.packed = *reinterpret_cast<int4 const*>(&smem[offset]);
-        // }
-        // if constexpr (Affine)
-        {
-            weight_vec.packed = *reinterpret_cast<int4 const*>(weight_buffer + offset);
-        // }
-        inter_vec.packed = rms_norm<T, Affine>(denom, inter_vec, weight_vec);
-        *reinterpret_cast<int4*>(&local_final_output_buffer[offset]) = inter_vec.packed;
-    }
+    float denom = __fsqrt_rn(__fdividef(acc, n_elems) + EPS);
+    //for (int offset = thread_offset; offset < n_elems; offset += blockDim.x * kPackedSize) {
+    // gamma_vec.packed = *reinterpret_cast<int4 const*>(gamma + offset);
+    gamma_vec.packed = ldg(reinterpret_cast<int4 const*>(gamma + offset));
+    inter_vec.packed = gl::rms_norm<T, true>(denom, inter_vec, gamma_vec);
+    *reinterpret_cast<int4*>(&local_final_output_buffer[offset]) = inter_vec.packed;
+    //}end for
 }
 
 
@@ -500,9 +355,9 @@ void invokeLookUpRms(T* residual, T* out, Idx const* input, Tw const* weight, in
     }
     int cta_num = token_num;
     int smem_size = 0;
-    if (cta_size * details::kBytesPerAccess / sizeof(T) >= params.fusion_params.hidden_size)
+    if (cta_size * gl::details::kBytesPerAccess / sizeof(T) >= n_embed)
     {
-        rms_norm_kernel<T, Bias, Residual, Affine, false><<<cta_num, cta_size, smem_size, stream>>>(params);
+        lookupRmsKernel<T, Tw, Idx><<<cta_num, cta_size, smem_size, stream>>>(residual, out, input, weight, token_num, offset, size, n_embed, gamma);
     }
     else
     {
@@ -514,7 +369,95 @@ void invokeLookUpRms(T* residual, T* out, Idx const* input, Tw const* weight, in
 }
 
 
+#define INSTANTIATE_LOOK_UPRMS(T, Tw, Idx)                                                                                    \
+    template void invokeLookUpRms<T, Tw, Idx>(T* residual, T * out, Idx const* input, Tw const* weight, int64_t const token_num,            \
+        Idx const offset, Idx const size, Idx const n_embed, Tw const* gamma, cudaStream_t stream)
 
+// INSTANTIATE_LOOK_UPRMS(float, int);
+// INSTANTIATE_LOOK_UPRMS(half, int);
+
+#ifdef ENABLE_BF16
+INSTANTIATE_LOOK_UPRMS(__nv_bfloat16, __nv_bfloat16, int);
+#endif
+
+
+template <typename T>
+__global__ void rmsRsidKernel(T* output_resid, T* output, T const* input, T const* input_resid, int const n_elems/*hidSz*/, T const* __restrict gamma)
+{
+    static constexpr int kPackedSize = gl::details::kBytesPerAccess / sizeof(T);
+    using PackedStruct = typename gl::PackedOn16Bytes<T>::Type;
+
+    // extern __shared__ uint8_t smem_ptr[];
+    // T* smem = reinterpret_cast<T*>(smem_ptr);
+
+    int bid = blockIdx.x, tid = threadIdx.x;
+
+    int offset = tid * kPackedSize;//thread_offset
+    int block_offset = bid * n_elems;
+    T const* intermediate_buffer = input + block_offset;
+    T const* residual_buffer = input_resid + block_offset;
+    T* residual_out = output_resid + block_offset;
+    T* local_final_output_buffer = output + block_offset;
+    PackedStruct inter_vec, resid_gamma_vec;
+    float acc = 0.f;
+    //for (int offset = thread_offset; offset < n_elems; offset += blockDim.x * kPackedSize) {
+    inter_vec.packed = *reinterpret_cast<int4 const*>(intermediate_buffer + offset);
+    resid_gamma_vec.packed = *reinterpret_cast<int4 const*>(residual_buffer + offset);
+    inter_vec.packed = gl::add128b(inter_vec, resid_gamma_vec);
+    *reinterpret_cast<int4*>(residual_out + offset) = inter_vec.packed;
+    acc = gl::accumulate<T>(acc, inter_vec);
+    //}end for
+    
+    acc = gl::block_reduce_sum(acc);
+    float denom = __fsqrt_rn(__fdividef(acc, n_elems) + EPS);
+    //for (int offset = thread_offset; offset < n_elems; offset += blockDim.x * kPackedSize) {
+    // resid_gamma_vec.packed = *reinterpret_cast<int4 const*>(gamma + offset);
+    resid_gamma_vec.packed = ldg(reinterpret_cast<int4 const*>(gamma + offset));
+    inter_vec.packed = gl::rms_norm<T, true>(denom, inter_vec, resid_gamma_vec);
+    *reinterpret_cast<int4*>(&local_final_output_buffer[offset]) = inter_vec.packed;
+    //}end for
+}
+
+template <typename T>
+void invokeRmsResid(T* output_resid, T* output, T const* input, T const* input_resid, int const n_embed/*hidSz*/, T const* gamma, int64_t const token_num, cudaStream_t stream)
+{
+    sync_check_cuda_error();
+    static constexpr int kPackedSize = gl::details::kBytesPerAccess / sizeof(T);
+    TLLM_CHECK(n_embed % kPackedSize == 0);
+    int need_threads = n_embed / kPackedSize;
+    int cta_size;
+    if (need_threads <= gl::details::kMaxCtaSize)
+    {
+        cta_size = (need_threads + gl::details::kWarpSize - 1) / gl::details::kWarpSize * gl::details::kWarpSize;
+    }
+    else
+    {
+        cta_size = gl::details::kMaxCtaSize;
+    }
+    int cta_num = token_num;
+    int smem_size = 0;
+    if (cta_size * gl::details::kBytesPerAccess / sizeof(T) >= n_embed)
+    {
+        rmsRsidKernel<T><<<cta_num, cta_size, smem_size, stream>>>(output_resid, output, input, input_resid, n_embed, gamma);
+    }
+    else
+    {
+        // smem_size = params.fusion_params.hidden_size * sizeof(T);
+        // rms_norm_kernel<T, Bias, Residual, Affine, true><<<cta_num, cta_size, smem_size, stream>>>(params);
+        TLLM_THROW("hidSz is too large. NOT supported");
+    }
+    sync_check_cuda_error();
+}
+
+#define INSTANTIATE_LOOK_RMSRESID(T)                                                                                    \
+    template void invokeRmsResid(T* output_resid, T* output, T const* input, T const* input_resid, int const n_embed/*hidSz*/, T const* gamma, int64_t const token_num, cudaStream_t stream)
+
+// INSTANTIATE_LOOK_UPRMS(float, int);
+// INSTANTIATE_LOOK_UPRMS(half, int);
+
+#ifdef ENABLE_BF16
+INSTANTIATE_LOOK_RMSRESID(__nv_bfloat16);
+#endif
 
 } // namespace kernels
 } // namespace tensorrt_llm

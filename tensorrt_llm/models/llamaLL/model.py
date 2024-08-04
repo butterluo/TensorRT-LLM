@@ -297,7 +297,7 @@ class LLaMALLModel(Module):
 
         self.mapping = config.mapping
         if  self.mapping.is_first_pp_rank() and self.mapping.world_size == 1:
-            self.embRms =tensorrt_llm.functionalGL. EmbRms(config.vocab_size,
+            self.embRms =tensorrt_llm.functionalGL.EmbRms(config.vocab_size,
                           config.hidden_size,
                           dtype=config.dtype)
         elif self.mapping.is_first_pp_rank():

@@ -24,7 +24,7 @@ def parse_arguments():
     parser.add_argument('-m',
                         '--model',
                         type=str,
-                        default="llama_tiny",
+                        default="llamall_tiny", #llama_tiny, llamall_tiny
                         choices=get_allowed_models(),
                         help='Specify model you want to benchmark.')
     parser.add_argument(
@@ -275,13 +275,13 @@ def parse_arguments():
         "Warning: only GPT model family is supported for now")
     parser.add_argument(
         '--dump_profile',
-        default=False,
+        default=True,
         action='store_true',
         help="Print profile information per layer (default = disabled)")
 
     parser.add_argument(
         '--dump_layer_info',
-        default=False,
+        default=True,
         action='store_true',
         help=
         "Print layer information of the engine to console (default = disabled)")
